@@ -32,6 +32,7 @@ $rows = array_values(array_filter($visits, fn($v)=>$q===''||stripos($v['doctorNa
 usort($rows, fn($a,$b)=>strcmp($b['dateOfVisit'],$a['dateOfVisit']));
 $doctors = entity_all('doctors');
 $specialties = array_values(array_unique(array_filter(array_map(fn($d)=>$d['speciality'],$doctors))));
+$rows = paginate($rows);
 require __DIR__ . '/../partials/top.php';
 ?>
 <div class="flex items-center justify-between gap-4 mb-5"><h1 class="text-2xl font-bold text-gray-900">Doctor Visits</h1><button onclick="openNew()" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">+ Add Visit</button></div>
@@ -57,6 +58,7 @@ require __DIR__ . '/../partials/top.php';
   <?php endforeach; if (!$rows): ?><tr><td colspan="10" class="px-4 py-10 text-center text-gray-400">No visits found</td></tr><?php endif; ?>
   </tbody>
 </table></div></div>
+<?= render_pagination() ?>
 <div id="modal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4"><div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
   <h3 id="modalTitle" class="text-lg font-semibold text-gray-900 mb-4">Add Visit</h3>
   <form method="post"><input type="hidden" name="action" value="save"><input type="hidden" name="id" id="f_id">

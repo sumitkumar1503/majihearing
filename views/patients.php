@@ -58,6 +58,7 @@ $rows = array_values(array_filter($all, function ($p) use ($q, $branchFilter, $s
 
 $branchList = active_branch_names();
 $testList = active_test_names();
+$rows = paginate($rows);
 
 require __DIR__ . '/../partials/top.php';
 ?>
@@ -90,7 +91,7 @@ require __DIR__ . '/../partials/top.php';
       <tbody class="divide-y divide-gray-200">
       <?php foreach ($rows as $i => $p): $j = json_encode($p); ?>
         <tr class="hover:bg-gray-50 cursor-pointer" onclick='openEdit(<?= h($j) ?>)'>
-          <td class="px-4 py-3 text-gray-600"><?= $i + 1 ?></td>
+          <td class="px-4 py-3 text-gray-600"><?= page_offset() + $i + 1 ?></td>
           <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><?= h(format_date($p['date'])) ?></td>
           <td class="px-4 py-3 font-medium text-gray-900"><?= h($p['name']) ?></td>
           <td class="px-4 py-3 text-gray-600"><?= h($p['ageSex']) ?></td>
@@ -120,6 +121,8 @@ require __DIR__ . '/../partials/top.php';
     </table>
   </div>
 </div>
+
+<?= render_pagination() ?>
 
 <!-- Modal -->
 <div id="modal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">

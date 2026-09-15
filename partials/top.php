@@ -5,19 +5,6 @@ $role = current_role();
 $theme = role_theme($role);
 $currentSlug = $_GET['page'] ?? 'dashboard';
 $flashes = take_flash();
-$pending = is_admin() ? pending_approvals_count() : 0;
-
-function nav_icon(string $key): string {
-    // compact inline SVGs (Heroicons outline), fallback = document icon
-    $p = [
-        'dashboard' => 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10',
-        'users' => 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z',
-        'patients' => 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z',
-        'appointments' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-    ];
-    $d = $p[$key] ?? 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z';
-    return '<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="' . $d . '"/></svg>';
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -79,12 +66,17 @@ function nav_icon(string $key): string {
           <h1 class="text-lg font-semibold truncate"><?= h($title ?? 'Dashboard') ?></h1>
         </div>
         <div class="flex items-center gap-3">
-          <?php if (is_admin()): ?>
-          <a href="index.php?page=requests" class="relative rounded-lg p-2 hover:bg-white/10" title="Approval requests">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1"/></svg>
-            <?php if ($pending > 0): ?><span class="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold"><?= $pending > 99 ? '99+' : $pending ?></span><?php endif; ?>
-          </a>
-          <?php endif; ?>
+          <!-- Notification bell + dropdown (all roles) -->
+          <div class="relative" id="notifWrap">
+            <button type="button" onclick="toggleNotif()" class="relative rounded-lg p-2 hover:bg-white/10" title="Notifications">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
+              <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold">0</span>
+            </button>
+            <div id="notifPanel" class="hidden absolute right-0 top-full mt-1 z-40 w-80 max-h-96 overflow-y-auto rounded-xl bg-white shadow-xl ring-1 ring-black/5 text-gray-800">
+              <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100"><p class="text-sm font-semibold text-gray-800">Notifications</p><?php if (is_admin()): ?><a href="index.php?page=requests" class="text-xs font-medium text-indigo-600 hover:underline">View all</a><?php endif; ?></div>
+              <div id="notifList" class="divide-y divide-gray-50"><p class="px-4 py-8 text-center text-sm text-gray-400">Loading…</p></div>
+            </div>
+          </div>
           <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-semibold"><?= h(strtoupper(substr($u['name'] ?? 'U', 0, 2))) ?></div>
         </div>
       </div>

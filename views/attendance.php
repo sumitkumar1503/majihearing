@@ -40,6 +40,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($admin && $a === 'approve') { $r=entity_find('attendance',$_POST['id']??''); if($r){ $r['status']='Approved'; if(!$r['totalHours'])$r['totalHours']=att_total($r,$SESS); entity_update('attendance',$r); } set_flash('success','Attendance approved'); redirect('index.php?page=attendance'); }
     if ($admin && $a === 'unlock') { $r=entity_find('attendance',$_POST['id']??''); if($r){ $r['checkOutTime']=$_POST['checkOutTime']?:'18:00'; $r['checkOutLocation']='Admin override'; $r['totalHours']=att_total($r,$SESS); $r['status']='Approved'; entity_update('attendance',$r); } set_flash('success','User unlocked'); redirect('index.php?page=attendance'); }
+    if ($admin && $a === 'editsave') {
+        $r = entity_find('attendance', $_POST['id']??'');
+        if ($r) {
+            foreach (['checkInTime','checkInLocation','checkOutTime','checkOutLocation','checkIn2Time','checkIn2Location','checkOut2Time','checkOut2Location','checkIn3Time','checkIn3Location','checkOut3Time','checkOut3Location'] as $fld) $r[$fld] = $_POST[$fld] ?? ($r[$fld] ?? '');
+            $r['status'] = $_POST['status'] ?? $r['status'];
+            $r['totalHours'] = ($_POST['totalHours'] ?? '') !== '' ? $_POST['totalHours'] : att_total($r, $SESS);
+            entity_update('attendance', $r);
+        }
+        set_flash('success','Record updated'); redirect('index.php?page=attendance');
+    }
     if ($admin && $a === 'delete') { entity_delete('attendance',$_POST['id']??''); set_flash('success','Deleted'); redirect('index.php?page=attendance'); }
 }
 
@@ -65,6 +75,7 @@ $presentToday = count(array_filter($records, fn($r)=>$r['date']===$today));
 $pendingAdmin = count(array_filter($records, fn($r)=>($r['status']??'')!=='Approved'));
 $appr = array_filter($records, fn($r)=>$r['status']==='Approved' && $r['totalHours']);
 $avg = $appr ? number_format(array_sum(array_map(fn($r)=>(float)$r['totalHours'],$appr))/count($appr),1) : '0.0';
+$rows = paginate($rows);
 require __DIR__ . '/../partials/top.php';
 ?>
 <h1 class="text-2xl font-bold text-gray-900 mb-5">Attendance</h1>
@@ -117,6 +128,7 @@ require __DIR__ . '/../partials/top.php';
       <td class="px-4 py-3"><div class="flex items-center gap-3">
         <?php if (($r['status']??'')!=='Approved'): ?><form method="post"><input type="hidden" name="action" value="approve"><input type="hidden" name="id" value="<?= h($r['id']) ?>"><button class="text-green-600 text-xs font-medium">Approve</button></form><?php endif; ?>
         <?php if ($pending): ?><form method="post" onsubmit="var t=prompt('Check-out time (HH:MM)','18:00'); if(!t)return false; this.checkOutTime.value=t;"><input type="hidden" name="action" value="unlock"><input type="hidden" name="id" value="<?= h($r['id']) ?>"><input type="hidden" name="checkOutTime"><button class="text-amber-600 text-xs font-medium">Unlock</button></form><?php endif; ?>
+        <button type="button" onclick='attEdit(<?= h(json_encode($r)) ?>)' class="text-indigo-600 text-xs font-medium">Edit</button>
         <form method="post" onsubmit="return confirm('Delete?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= h($r['id']) ?>"><button class="text-red-500 text-xs font-medium">Delete</button></form>
       </div></td>
       <?php endif; ?>
@@ -124,7 +136,34 @@ require __DIR__ . '/../partials/top.php';
   <?php endforeach; if (!$rows): ?><tr><td colspan="<?= $admin?7:6 ?>" class="px-4 py-10 text-center text-gray-400">No attendance records found</td></tr><?php endif; ?>
   </tbody>
 </table></div></div>
+<?= render_pagination() ?>
+<?php if ($admin): ?>
+<div id="attModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4"><div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+  <h3 class="text-lg font-semibold text-gray-900 mb-4">Edit Attendance Record</h3>
+  <form method="post"><input type="hidden" name="action" value="editsave"><input type="hidden" name="id" id="a_id">
+    <div class="grid grid-cols-2 gap-4 text-sm mb-4"><div><p class="text-gray-500">Employee</p><p class="font-medium" id="a_user"></p></div><div><p class="text-gray-500">Date</p><p class="font-medium" id="a_date"></p></div></div>
+    <div class="space-y-3">
+      <?php foreach ([['Session 1','checkInTime','checkInLocation','checkOutTime','checkOutLocation'],['Session 2','checkIn2Time','checkIn2Location','checkOut2Time','checkOut2Location'],['Session 3','checkIn3Time','checkIn3Location','checkOut3Time','checkOut3Location']] as $s): ?>
+      <div class="rounded-lg border border-gray-200 p-3"><p class="text-xs font-semibold text-gray-600 mb-2"><?= $s[0] ?></p><div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-[11px] font-medium text-green-700 mb-1">Check-In Time</label><input type="time" name="<?= $s[1] ?>" id="a_<?= $s[1] ?>" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"></div>
+        <div><label class="block text-[11px] font-medium text-red-700 mb-1">Check-Out Time</label><input type="time" name="<?= $s[3] ?>" id="a_<?= $s[3] ?>" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"></div>
+        <div><label class="block text-[11px] font-medium text-gray-500 mb-1">In Location</label><input type="text" name="<?= $s[2] ?>" id="a_<?= $s[2] ?>" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs"></div>
+        <div><label class="block text-[11px] font-medium text-gray-500 mb-1">Out Location</label><input type="text" name="<?= $s[4] ?>" id="a_<?= $s[4] ?>" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs"></div>
+      </div></div>
+      <?php endforeach; ?>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Hours (override)</label><input type="text" name="totalHours" id="a_totalHours" placeholder="Auto-calculated if blank" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">Status</label><select name="status" id="a_status" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="Pending Admin">Pending Admin</option><option value="Approved">Approved</option></select></div>
+    </div>
+    <div class="mt-6 flex justify-end gap-3"><button type="button" onclick="closeModal('attModal')" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700">Cancel</button><button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">Save Changes</button></div>
+  </form>
+</div></div>
+<?php endif; ?>
 <script>
+function attEdit(r){ document.getElementById('a_id').value=r.id; document.getElementById('a_user').textContent=r.userName; document.getElementById('a_date').textContent=r.date;
+  ['checkInTime','checkInLocation','checkOutTime','checkOutLocation','checkIn2Time','checkIn2Location','checkOut2Time','checkOut2Location','checkIn3Time','checkIn3Location','checkOut3Time','checkOut3Location'].forEach(function(k){ var el=document.getElementById('a_'+k); if(el) el.value=r[k]||''; });
+  document.getElementById('a_totalHours').value=r.totalHours||''; document.getElementById('a_status').value=r.status||'Pending Admin'; openModal('attModal'); }
 setInterval(function(){ var c=document.getElementById('clock'); if(c){ var d=new Date(); c.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); } }, 30000);
 function captureGPS(form){
   var btn=form.querySelector('button'); if(btn){btn.disabled=true;}

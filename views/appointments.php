@@ -64,7 +64,7 @@ require __DIR__ . '/../partials/top.php';
 <div class="bg-white rounded-xl border border-gray-200 mt-5"><div class="px-4 py-3 border-b border-gray-200"><h3 class="text-sm font-semibold text-gray-700">All Appointments for <?= h(format_date($selectedDate)) ?> (<?= count($dayRows) ?>)</h3></div><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 text-sm">
   <thead class="bg-gray-50"><tr><?php foreach (['Time','Patient','Age/Sex','Contact','Test','Branch','Payment','Test Status',''] as $htxt): ?><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"><?= $htxt ?></th><?php endforeach; ?></tr></thead>
   <tbody class="divide-y divide-gray-200">
-  <?php foreach ($dayRows as $ap): ?>
+  <?php foreach (paginate($dayRows) as $ap): ?>
     <tr class="hover:bg-gray-50 cursor-pointer" onclick='openEdit(<?= h(json_encode($ap)) ?>)'>
       <td class="px-4 py-3 font-medium"><?= h($ap['time']) ?></td><td class="px-4 py-3 font-medium text-gray-900"><?= h($ap['patientName']) ?></td>
       <td class="px-4 py-3 text-gray-600"><?= h($ap['ageSex']) ?></td><td class="px-4 py-3 text-gray-600"><?= h($ap['contactNo']) ?><?php if($ap['contactNo']): ?> <a onclick="event.stopPropagation()" href="<?= h(wa_link($ap['contactNo'])) ?>" target="_blank" class="text-green-500">WA</a><?php endif; ?></td>
@@ -75,7 +75,7 @@ require __DIR__ . '/../partials/top.php';
     </tr>
   <?php endforeach; ?>
   </tbody>
-</table></div></div>
+</table></div></div><?= render_pagination() ?>
 <?php endif; ?>
 <div id="modal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4"><div class="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
   <h3 id="modalTitle" class="text-lg font-semibold text-gray-900 mb-4">Book Appointment</h3>

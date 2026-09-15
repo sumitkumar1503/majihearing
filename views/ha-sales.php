@@ -11,6 +11,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('ha-sales', $assoc['id']) : null;
         $res = submit_change('ha-sales','HA Sales',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' HA sale — '.$assoc['name'].' / '.$assoc['haModel'].' (₹'.$assoc['sellingPrice'].')',$old,!$admin);
+        // On a direct (admin) create, deduct matching serials from HA stock.
+        if ($res === 'applied' && !$isEdit) {
+            $stock = entity_all('ha-stock');
+            foreach (array_filter([$assoc['rightSerialNo'], $assoc['leftSerialNo']]) as $serial) {
+                $matched = null;
+                foreach ($stock as $st) { if (strtolower(trim($st['serialNumber'])) === strtolower(trim($serial))) { $matched = $st; break; } }
+                if ($matched) { if (!$matched['soldDate']) { $matched['soldDate'] = $assoc['date']; entity_update('ha-stock', $matched); } }
+                else { entity_insert('ha-stock', ['date'=>$assoc['date'],'brand'=>$assoc['source'],'model'=>$assoc['haModel'],'serialNumber'=>$serial,'mfdDate'=>'','source'=>$assoc['source'],'branch'=>$assoc['branch'],'soldDate'=>$assoc['date'],'remarks'=>'Auto-added from HA Sale - '.$assoc['name'],'mrp'=>$assoc['mrp']]); }
+            }
+        }
         set_flash('success', $res==='queued'?'Change sent for admin approval':($isEdit?'Sale updated':'Sale recorded'));
         redirect('index.php?page=ha-sales');
     }
@@ -39,6 +49,7 @@ $fyStart = "$fyYear-04-01"; $fyEnd = ($fyYear+1)."-03-31";
 $fCount=0;$fMrp=0;$fSell=0; foreach ($sales as $r){ $d=normalize_date_string($r['date']); if ($d>=$fyStart && $d<=$fyEnd){$fCount++;$fMrp+=(float)$r['mrp'];$fSell+=(float)$r['sellingPrice'];} }
 $brands = active_brand_names(); $branchList = active_branch_names();
 $inp = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm';
+$rows = paginate($rows);
 require __DIR__ . '/../partials/top.php';
 ?>
 <div class="flex items-center justify-between gap-4 mb-5"><h1 class="text-2xl font-bold text-gray-900">Hearing Aid Sales</h1><button onclick="openNew()" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">+ Add Sale</button></div>
@@ -66,7 +77,7 @@ require __DIR__ . '/../partials/top.php';
   <tbody class="divide-y divide-gray-200">
   <?php foreach ($rows as $i=>$s): ?>
     <tr class="hover:bg-gray-50 cursor-pointer" onclick='openEdit(<?= h(json_encode($s)) ?>)'>
-      <td class="px-3 py-3"><?= $i+1 ?></td><td class="px-3 py-3 whitespace-nowrap"><?= h(format_date($s['date'])) ?></td>
+      <td class="px-3 py-3"><?= page_offset() + $i+1 ?></td><td class="px-3 py-3 whitespace-nowrap"><?= h(format_date($s['date'])) ?></td>
       <td class="px-3 py-3 font-medium text-gray-900"><?= h($s['name']) ?></td><td class="px-3 py-3 text-gray-600"><?= h($s['contactNo']) ?></td>
       <td class="px-3 py-3"><?= h($s['branch']) ?></td><td class="px-3 py-3 text-gray-600"><?= h($s['haModel']) ?></td>
       <td class="px-3 py-3 text-gray-600"><?= h($s['serialNumber']) ?></td><td class="px-3 py-3"><?= h($s['side']) ?></td>
@@ -77,6 +88,7 @@ require __DIR__ . '/../partials/top.php';
   <?php endforeach; if (!$rows): ?><tr><td colspan="13" class="px-4 py-10 text-center text-gray-400">No sales found</td></tr><?php endif; ?>
   </tbody>
 </table></div></div>
+<?= render_pagination() ?>
 <div id="modal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4"><div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
   <h3 id="modalTitle" class="text-lg font-semibold text-gray-900 mb-4">Record Sale</h3>
   <form method="post"><input type="hidden" name="action" value="save"><input type="hidden" name="id" id="f_id"><input type="hidden" name="sn" id="f_sn">

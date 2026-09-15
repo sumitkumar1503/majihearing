@@ -43,6 +43,7 @@ $q = trim($_GET['q'] ?? '');
 if ($q !== '') $users = array_values(array_filter($users, fn($u) => stripos($u['name'],$q)!==false || stripos($u['email'],$q)!==false));
 $customRoles = array_values(array_unique(array_filter(array_map(fn($u)=>$u['role'], entity_all('users')), fn($r)=>$r && !in_array($r,$DEFAULT_ROLES,true))));
 $roleColors = ['admin'=>'bg-indigo-100 text-indigo-700','doctor'=>'bg-teal-100 text-teal-700','staff'=>'bg-blue-100 text-blue-700','marketing'=>'bg-amber-100 text-amber-700'];
+$users = paginate($users);
 
 require __DIR__ . '/../partials/top.php';
 ?>
@@ -74,6 +75,7 @@ require __DIR__ . '/../partials/top.php';
   <?php endforeach; ?>
   </tbody>
 </table></div></div>
+<?= render_pagination() ?>
 
 <div id="modal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
   <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">

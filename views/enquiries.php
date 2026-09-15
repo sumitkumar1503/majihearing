@@ -17,6 +17,7 @@ $rows = entity_all('enquiries');
 usort($rows, fn($a,$b)=>strcmp($b['enquiryDate'],$a['enquiryDate']));
 $q = trim($_GET['q'] ?? ''); $sf = $_GET['status'] ?? 'All';
 $rows = array_values(array_filter($rows, function($e) use ($q,$sf){ if ($q!=='' && stripos($e['patientName'],$q)===false && stripos($e['source'],$q)===false) return false; if ($sf!=='All' && $e['status']!==$sf) return false; return true; }));
+$rows = paginate($rows);
 require __DIR__ . '/../partials/top.php';
 ?>
 <div class="flex items-center justify-between gap-4 mb-5"><h1 class="text-2xl font-bold text-gray-900">Enquiries</h1><button onclick="openNew()" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">+ Add Enquiry</button></div>
@@ -38,6 +39,7 @@ require __DIR__ . '/../partials/top.php';
   <?php endforeach; if (!$rows): ?><tr><td colspan="8" class="px-4 py-10 text-center text-gray-400">No enquiries found</td></tr><?php endif; ?>
   </tbody>
 </table></div></div>
+<?= render_pagination() ?>
 <div id="modal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4"><div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
   <h3 id="modalTitle" class="text-lg font-semibold text-gray-900 mb-4">Add Enquiry</h3>
   <form method="post"><input type="hidden" name="action" value="save"><input type="hidden" name="id" id="f_id">

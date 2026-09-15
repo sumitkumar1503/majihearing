@@ -155,6 +155,66 @@ function pill(string $status): string {
     return 'bg-gray-100 text-gray-600';
 }
 
+/** Paginate an array using ?pg= and ?ps= (page size). Stores meta in a global
+ *  for render_pagination(). Returns the current page slice. */
+function paginate(array $rows, int $perPage = 10): array {
+    $perPage = (int)($_GET['ps'] ?? $perPage);
+    if ($perPage < 1) $perPage = 10;
+    $total = count($rows);
+    $pages = max(1, (int)ceil($total / $perPage));
+    $page = max(1, (int)($_GET['pg'] ?? 1));
+    if ($page > $pages) $page = $pages;
+    $GLOBALS['__pg'] = ['total' => $total, 'page' => $page, 'pages' => $pages, 'perPage' => $perPage];
+    return array_slice($rows, ($page - 1) * $perPage, $perPage);
+}
+
+/** Row-number offset for the current page (for SN columns). */
+function page_offset(): int {
+    $p = $GLOBALS['__pg'] ?? null;
+    return $p ? ($p['page'] - 1) * $p['perPage'] : 0;
+}
+
+/** Renders pagination controls that mirror the Next.js Pagination component. */
+function render_pagination(): string {
+    $p = $GLOBALS['__pg'] ?? null;
+    if (!$p || $p['total'] <= $p['perPage']) return '';
+    $mk = function ($pg, $ps = null) {
+        $qs = $_GET; $qs['pg'] = $pg; if ($ps !== null) $qs['ps'] = $ps;
+        return 'index.php?' . h(http_build_query($qs));
+    };
+    $from = ($p['page'] - 1) * $p['perPage'] + 1;
+    $to = min($p['page'] * $p['perPage'], $p['total']);
+    // visible page numbers with ellipsis
+    $vis = [];
+    if ($p['pages'] <= 5) { for ($i = 1; $i <= $p['pages']; $i++) $vis[] = $i; }
+    else {
+        $vis[] = 1;
+        $start = max(2, $p['page'] - 1); $end = min($p['pages'] - 1, $p['page'] + 1);
+        if ($start > 2) $vis[] = '...';
+        for ($i = $start; $i <= $end; $i++) $vis[] = $i;
+        if ($end < $p['pages'] - 1) $vis[] = '...';
+        $vis[] = $p['pages'];
+    }
+    ob_start(); ?>
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 pb-1">
+      <div class="flex items-center gap-3 text-sm text-gray-500">
+        <span><span class="font-medium text-gray-700"><?= $from ?>–<?= $to ?></span> of <span class="font-medium text-gray-700"><?= $p['total'] ?></span></span>
+        <select onchange="location.href=this.value" class="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
+          <?php foreach ([10,25,50,100] as $s): ?><option value="<?= $mk(1, $s) ?>" <?= $p['perPage']===$s?'selected':'' ?>><?= $s ?> rows</option><?php endforeach; ?>
+        </select>
+      </div>
+      <div class="flex items-center gap-1 bg-gray-50 rounded-xl p-1 border border-gray-100">
+        <a href="<?= $mk(max(1,$p['page']-1)) ?>" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-white hover:shadow-sm <?= $p['page']<=1?'opacity-30 pointer-events-none':'' ?>">‹ Prev</a>
+        <div class="flex items-center gap-0.5 mx-0.5">
+          <?php foreach ($vis as $v): if ($v==='...'): ?><span class="px-1.5 text-xs text-gray-400">…</span><?php else: ?><a href="<?= $mk($v) ?>" class="min-w-[28px] h-7 inline-flex items-center justify-center rounded-lg text-xs font-semibold <?= $v===$p['page']?'bg-indigo-600 text-white shadow-sm':'text-gray-600 hover:bg-white hover:shadow-sm' ?>"><?= $v ?></a><?php endif; endforeach; ?>
+        </div>
+        <a href="<?= $mk(min($p['pages'],$p['page']+1)) ?>" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-white hover:shadow-sm <?= $p['page']>=$p['pages']?'opacity-30 pointer-events-none':'' ?>">Next ›</a>
+      </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
 /** Register a Chart.js config to render for a <canvas id>. */
 function add_chart(string $canvasId, array $config): void {
     if (!isset($GLOBALS['__charts'])) $GLOBALS['__charts'] = [];
