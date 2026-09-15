@@ -43,18 +43,17 @@ function slug_to_key(string $slug): ?string {
 }
 
 function attempt_login(string $email, string $password): bool {
-    $rows = sheets_get(spreadsheet_id('master'), 'Users!A2:J');
-    foreach ($rows as $r) {
-        $active = strtolower(cell($r, 7)) === 'true';
-        if (cell($r, 2) === $email && $active) {
-            if (password_verify($password, cell($r, 3))) {
-                $modules = array_filter(array_map('trim', explode(',', cell($r, 9))));
+    foreach (entity_all('users') as $u) {
+        $active = strtolower((string)($u['active'] ?? '')) === 'true';
+        if (($u['email'] ?? '') === $email && $active) {
+            if (password_verify($password, (string)($u['password'] ?? ''))) {
+                $modules = array_filter(array_map('trim', explode(',', (string)($u['modules'] ?? ''))));
                 $_SESSION['user'] = [
-                    'id' => cell($r, 0),
-                    'name' => cell($r, 1),
-                    'email' => cell($r, 2),
-                    'role' => cell($r, 4),
-                    'branch' => cell($r, 5),
+                    'id' => $u['id'] ?? '',
+                    'name' => $u['name'] ?? '',
+                    'email' => $u['email'] ?? '',
+                    'role' => $u['role'] ?? '',
+                    'branch' => $u['branch'] ?? '',
                     'modules' => array_values($modules),
                 ];
                 return true;

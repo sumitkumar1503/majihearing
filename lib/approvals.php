@@ -51,21 +51,25 @@ function submit_change(string $module, string $moduleLabel, string $action, arra
     return 'queued';
 }
 
-/** Write a daily sheet grid (DS-<branch>-<month>) — Test, Day, Amount, Quantity. */
+/** Save a daily grid (MySQL). Replaces all cells for that branch+month. */
 function save_daily_sheet(string $branch, string $month, array $entries): void {
-    $sheetName = "DS-$branch-$month";
-    $sid = spreadsheet_id('operations');
-    $exists = false;
-    try { sheets_get($sid, "$sheetName!A1:A1"); $exists = true; } catch (Exception $e) {}
-    if (!$exists) { sheets_ensure_sheet($sid, $sheetName); sheets_update($sid, "$sheetName!A1:D1", [['Test','Day','Amount','Quantity']]); }
-    $rows = [];
-    foreach ($entries as $e) $rows[] = [$e['testName'], $e['day'], $e['amount'], $e['quantity']];
-    if ($rows) sheets_update($sid, "$sheetName!A2:D" . (count($rows) + 1), $rows);
+    db_exec("DELETE FROM `daily_entries` WHERE `branch`=? AND `month`=?", [$branch, $month]);
+    foreach ($entries as $e) {
+        db_exec(
+            "INSERT INTO `daily_entries` (`branch`,`month`,`test_name`,`day`,`amount`,`quantity`) VALUES (?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE `amount`=VALUES(`amount`),`quantity`=VALUES(`quantity`)",
+            [$branch, $month, $e['testName'], (int)$e['day'], (float)$e['amount'], (float)$e['quantity']],
+            'sssidd'
+        );
+    }
 }
 
 function apply_daily_sheet_approval(string $newValueJson): void {
     $p = json_decode($newValueJson ?: '[]', true);
-    if (is_array($p)) save_daily_sheet($p['branch'] ?? '', $p['month'] ?? '', $p['entries'] ?? []);
+    if (is_array($p)) {
+        save_daily_sheet($p['branch'] ?? '', $p['month'] ?? '', $p['entries'] ?? []);
+        if (function_exists('mark_daily_dirty')) mark_daily_dirty($p['branch'] ?? '', $p['month'] ?? '');
+    }
 }
 
 /** Admin approves a pending request → apply the change to the real sheet. */

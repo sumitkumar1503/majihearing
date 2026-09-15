@@ -22,4 +22,16 @@ return [
 
     // Public URL of the site (used for absolute links)
     'app_url' => 'https://majihearing.eu',
+
+    // MySQL (primary datastore). Google Sheets becomes a synced mirror/backup.
+    'mysql' => [
+        'host' => 'localhost',
+        'name' => 'YOUR_DB_NAME',
+        'user' => 'YOUR_DB_USER',
+        'pass' => 'YOUR_DB_PASSWORD',
+        'port' => 3306,
+    ],
+
+    // One-time token to run DB setup / initial import via ?page=db-setup&token=...
+    'setup_token' => 'change-me',
 ];

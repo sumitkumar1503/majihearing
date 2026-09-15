@@ -1,7 +1,12 @@
 <?php
 /**
- * Data layer — generic read/write over the SAME Google Sheets & columns the
- * Next.js app uses. Each entity maps to a sheet tab + ordered field list.
+ * Data layer.
+ *
+ * PRIMARY store is MySQL (fast, no API quota). Google Sheets is kept as a
+ * synced mirror/backup (see lib/sync.php). The entity_* API is unchanged so
+ * every view keeps working; only the storage backend moved to MySQL.
+ *
+ * entities() also drives: the MySQL schema (lib/db.php) and the Sheets sync.
  */
 
 function entities(): array {
@@ -35,12 +40,107 @@ function entity_cfg(string $name): array {
     return $e[$name];
 }
 
-function entity_rows(string $name): array {
+/** MySQL table name for an entity (dashes → underscores). */
+function entity_table(string $name): string {
+    return str_replace('-', '_', $name);
+}
+
+/* ============================================================
+ * MySQL-backed entity API (used by all views)
+ * ============================================================ */
+
+function db_field_value(array $c, string $field, $value): string {
+    if (!empty($c['json']) && in_array($field, $c['json'], true)) {
+        return json_encode(is_array($value) ? $value : (json_decode((string)$value, true) ?: []));
+    }
+    if (!empty($c['dateFields']) && in_array($field, $c['dateFields'], true)) {
+        return normalize_date_string((string)$value);
+    }
+    return (string)$value;
+}
+
+function db_to_assoc(array $c, array $row): array {
+    $out = [];
+    foreach ($c['fields'] as $f) {
+        $v = $row[$f] ?? '';
+        if (!empty($c['json']) && in_array($f, $c['json'], true)) {
+            $dec = json_decode(($v === null || $v === '') ? '[]' : (string)$v, true);
+            $out[$f] = is_array($dec) ? $dec : [];
+        } else {
+            $out[$f] = $v === null ? '' : (string)$v;
+        }
+    }
+    return $out;
+}
+
+/** Per-request cache (in $GLOBALS['__entity_cache']) avoids repeat queries. */
+function entity_all(string $name): array {
+    if (isset($GLOBALS['__entity_cache'][$name])) return $GLOBALS['__entity_cache'][$name];
+    $c = entity_cfg($name);
+    $rows = db_all("SELECT * FROM `" . entity_table($name) . "`");
+    $out = [];
+    foreach ($rows as $r) $out[] = db_to_assoc($c, $r);
+    $GLOBALS['__entity_cache'][$name] = $out;
+    return $out;
+}
+
+function entity_bust(string $name): void { unset($GLOBALS['__entity_cache'][$name]); }
+
+function entity_find(string $name, string $id): ?array {
+    $c = entity_cfg($name);
+    $row = db_row("SELECT * FROM `" . entity_table($name) . "` WHERE `id`=? LIMIT 1", [$id]);
+    return $row ? db_to_assoc($c, $row) : null;
+}
+
+function entity_insert(string $name, array $a): string {
+    $c = entity_cfg($name);
+    if (empty($a['id'])) $a['id'] = $c['prefix'] . '-' . (time() . rand(100, 999));
+    $cols = []; $ph = []; $vals = []; $upd = [];
+    foreach ($c['fields'] as $f) {
+        $cols[] = "`$f`";
+        $ph[] = '?';
+        $vals[] = db_field_value($c, $f, $a[$f] ?? '');
+        if ($f !== 'id') $upd[] = "`$f`=VALUES(`$f`)";
+    }
+    $sql = "INSERT INTO `" . entity_table($name) . "` (" . implode(',', $cols) . ") VALUES (" . implode(',', $ph) . ") ON DUPLICATE KEY UPDATE " . implode(',', $upd);
+    db_exec($sql, $vals);
+    entity_bust($name);
+    return $a['id'];
+}
+
+function entity_update(string $name, array $a): bool {
+    $c = entity_cfg($name);
+    if (empty($a['id'])) return false;
+    $sets = []; $vals = [];
+    foreach ($c['fields'] as $f) {
+        if ($f === 'id') continue;
+        $sets[] = "`$f`=?";
+        $vals[] = db_field_value($c, $f, $a[$f] ?? '');
+    }
+    $vals[] = $a['id'];
+    $n = db_exec("UPDATE `" . entity_table($name) . "` SET " . implode(',', $sets) . " WHERE `id`=?", $vals);
+    entity_bust($name);
+    // If the row didn't exist yet, insert it (keeps behaviour forgiving).
+    if ($n === 0 && !entity_find($name, $a['id'])) { entity_insert($name, $a); }
+    return true;
+}
+
+function entity_delete(string $name, string $id): bool {
+    db_exec("DELETE FROM `" . entity_table($name) . "` WHERE `id`=?", [$id]);
+    entity_bust($name);
+    return true;
+}
+
+/* ============================================================
+ * Sheet helpers — ONLY used by the sync engine (lib/sync.php)
+ * ============================================================ */
+
+function sheet_rows(string $name): array {
     $c = entity_cfg($name);
     return sheets_get(spreadsheet_id($c['cat']), $c['sheet'] . '!A2:' . $c['last']);
 }
 
-function row_to_assoc(string $name, array $row, int $idx): array {
+function sheet_row_to_assoc(string $name, array $row, int $idx): array {
     $c = entity_cfg($name);
     $out = [];
     foreach ($c['fields'] as $i => $field) {
@@ -56,27 +156,19 @@ function row_to_assoc(string $name, array $row, int $idx): array {
     return $out;
 }
 
-function entity_all(string $name): array {
-    $rows = entity_rows($name);
+function sheet_all(string $name): array {
     $out = [];
-    foreach ($rows as $i => $row) $out[] = row_to_assoc($name, $row, $i);
+    foreach (sheet_rows($name) as $i => $row) $out[] = sheet_row_to_assoc($name, $row, $i);
     return $out;
 }
 
-function entity_find(string $name, string $id): ?array {
-    foreach (entity_all($name) as $r) {
-        if (($r['id'] ?? null) === $id) return $r;
-    }
-    return null;
-}
-
-function assoc_to_row(string $name, array $a): array {
+function assoc_to_sheet_row(string $name, array $a): array {
     $c = entity_cfg($name);
     $row = [];
     foreach ($c['fields'] as $field) {
         $v = $a[$field] ?? '';
         if (!empty($c['json']) && in_array($field, $c['json'], true)) {
-            $v = json_encode(is_array($v) ? $v : []);
+            $v = json_encode(is_array($v) ? $v : (json_decode((string)$v, true) ?: []));
         } elseif (!empty($c['dateFields']) && in_array($field, $c['dateFields'], true)) {
             $v = normalize_date_string((string)$v);
         }
@@ -85,40 +177,9 @@ function assoc_to_row(string $name, array $a): array {
     return $row;
 }
 
-function entity_insert(string $name, array $a): string {
-    $c = entity_cfg($name);
-    if (empty($a['id'])) $a['id'] = $c['prefix'] . '-' . (time() . rand(100, 999));
-    sheets_ensure_sheet(spreadsheet_id($c['cat']), $c['sheet']);
-    sheets_append(spreadsheet_id($c['cat']), $c['sheet'], assoc_to_row($name, $a));
-    return $a['id'];
-}
-
-function entity_update(string $name, array $a): bool {
-    $c = entity_cfg($name);
-    $rows = entity_rows($name);
-    foreach ($rows as $i => $row) {
-        if (cell($row, 0) === ($a['id'] ?? '')) {
-            $rowNum = $i + 2;
-            sheets_update(spreadsheet_id($c['cat']), $c['sheet'] . '!A' . $rowNum . ':' . $c['last'] . $rowNum, [assoc_to_row($name, $a)]);
-            return true;
-        }
-    }
-    return false;
-}
-
-function entity_delete(string $name, string $id): bool {
-    $c = entity_cfg($name);
-    $rows = entity_rows($name);
-    foreach ($rows as $i => $row) {
-        if (cell($row, 0) === $id) {
-            sheets_delete_row(spreadsheet_id($c['cat']), $c['sheet'], $i + 1);
-            return true;
-        }
-    }
-    return false;
-}
-
-/* ---------- Branch / brand / test helpers ---------- */
+/* ============================================================
+ * Branch / brand / test / config helpers (now MySQL-backed)
+ * ============================================================ */
 
 function active_branch_names(): array {
     $names = [];
@@ -136,24 +197,6 @@ function active_brand_names(): array {
     return $names;
 }
 
-function get_config(): array {
-    $out = [];
-    foreach (sheets_get(spreadsheet_id('master'), 'Config!A2:B') as $r) {
-        if (cell($r, 0) !== '') $out[cell($r, 0)] = cell($r, 1);
-    }
-    return $out;
-}
-
-function set_config_value(string $key, string $value): void {
-    $sid = spreadsheet_id('master');
-    sheets_ensure_sheet($sid, 'Config');
-    $rows = sheets_get($sid, 'Config!A2:B');
-    foreach ($rows as $i => $r) {
-        if (cell($r, 0) === $key) { sheets_update($sid, 'Config!A' . ($i + 2) . ':B' . ($i + 2), [[$key, $value]]); return; }
-    }
-    sheets_append($sid, 'Config', [$key, $value]);
-}
-
 function active_test_names(): array {
     $names = [];
     foreach (entity_all('tests') as $t) {
@@ -161,4 +204,37 @@ function active_test_names(): array {
     }
     if (!$names) $names = ['PTA','TYMP','ENG','OAE','ABR','VEMP','SRT/SDS','TDT','SISI','ETF','SP. THX','SWALLOW THX','VOICE THX'];
     return $names;
+}
+
+function get_config(): array {
+    $out = [];
+    foreach (db_all("SELECT `k`,`v` FROM `app_config`") as $r) {
+        $out[$r['k']] = $r['v'];
+    }
+    return $out;
+}
+
+function config_value(string $key, ?string $default = null): ?string {
+    $r = db_row("SELECT `v` FROM `app_config` WHERE `k`=? LIMIT 1", [$key]);
+    return $r ? $r['v'] : $default;
+}
+
+function set_config_value(string $key, string $value): void {
+    db_exec("INSERT INTO `app_config` (`k`,`v`) VALUES (?,?) ON DUPLICATE KEY UPDATE `v`=VALUES(`v`)", [$key, $value]);
+}
+
+/* ---------- Service catalog (MySQL) ---------- */
+
+function services_all(): array {
+    return db_all("SELECT `id`,`category`,`description`,`price` FROM `services` ORDER BY `category`,`description`");
+}
+
+/** Upsert a service, matching an existing row by original category+description. */
+function service_save(string $category, string $description, string $price, string $origCat = '', string $origDesc = ''): void {
+    $existing = db_row("SELECT `id` FROM `services` WHERE `category`=? AND `description`=? LIMIT 1", [$origCat, $origDesc]);
+    if ($existing) {
+        db_exec("UPDATE `services` SET `category`=?,`description`=?,`price`=? WHERE `id`=?", [$category, $description, $price, $existing['id']]);
+    } else {
+        db_exec("INSERT INTO `services` (`category`,`description`,`price`) VALUES (?,?,?)", [$category, $description, $price]);
+    }
 }

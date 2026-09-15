@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     $payload = ['month'=>$monthStr,'branch'=>$branch,'entries'=>$entries];
-    if ($admin) { save_daily_sheet($branch, $monthStr, $entries); set_flash('success','Daily sheet saved'); }
+    if ($admin) { save_daily_sheet($branch, $monthStr, $entries); mark_daily_dirty($branch, $monthStr); set_flash('success','Daily sheet saved'); }
     else {
         entity_insert('approvals', ['createdAt'=>date('c'),'requestedBy'=>current_user()['name']??'','requestedByRole'=>current_role(),'module'=>'daily-sheet','moduleLabel'=>'Daily Sheet','action'=>'update','targetId'=>"$branch-$monthStr",'summary'=>"Update daily sheet — $branch / $monthStr",'oldValue'=>'','newValue'=>json_encode($payload),'status'=>'pending','reviewedBy'=>'','reviewedAt'=>'']);
         set_flash('success','Sheet sent for admin approval');

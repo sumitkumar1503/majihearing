@@ -7,9 +7,13 @@ function ds_sheet_name(string $branch, string $month): string {
     return "DS-$branch-$month";
 }
 
-/** Read a daily sheet grid → rows of [testName, day, amount, quantity]. */
+/** Read a daily grid (MySQL) → rows of [testName, day, amount, quantity]. */
 function daily_sheet_rows(string $branch, string $month): array {
-    return sheets_get(spreadsheet_id('operations'), ds_sheet_name($branch, $month) . '!A2:D');
+    $out = [];
+    foreach (db_all("SELECT `test_name`,`day`,`amount`,`quantity` FROM `daily_entries` WHERE `branch`=? AND `month`=?", [$branch, $month]) as $r) {
+        $out[] = [$r['test_name'], $r['day'], $r['amount'], $r['quantity']];
+    }
+    return $out;
 }
 
 /** Revenue for a month = daily sheet amount totals (per branch) + HA sales. */

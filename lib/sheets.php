@@ -110,16 +110,40 @@ function http_request(string $method, string $url, array $headers = [], ?string 
 }
 
 function sheets_api(string $method, string $path, ?array $payload = null): array {
-    $token = google_access_token();
     $url = 'https://sheets.googleapis.com/v4/spreadsheets/' . $path;
-    $headers = ['Authorization: Bearer ' . $token, 'Content-Type: application/json'];
     $body = $payload !== null ? json_encode($payload) : null;
-    $resp = http_request($method, $url, $headers, $body);
-    $data = json_decode($resp['body'], true);
-    if ($resp['status'] >= 400) {
-        throw new Exception('Sheets API ' . $resp['status'] . ': ' . $resp['body']);
+    $attempts = 0;
+    while (true) {
+        $attempts++;
+        $token = google_access_token();
+        $headers = ['Authorization: Bearer ' . $token, 'Content-Type: application/json'];
+        $resp = http_request($method, $url, $headers, $body);
+        // Retry on rate-limit / transient server errors with backoff.
+        if (in_array($resp['status'], [429, 500, 503], true) && $attempts < 5) {
+            sleep($attempts); // 1s, 2s, 3s, 4s
+            continue;
+        }
+        $data = json_decode($resp['body'], true);
+        if ($resp['status'] >= 400) {
+            throw new Exception('Sheets API ' . $resp['status'] . ': ' . $resp['body']);
+        }
+        return is_array($data) ? $data : [];
     }
-    return is_array($data) ? $data : [];
+}
+
+/** Clear the values in a range (keeps the sheet/tab). */
+function sheets_clear(string $spreadsheetId, string $range): void {
+    sheets_api('POST', $spreadsheetId . '/values/' . rawurlencode($range) . ':clear');
+}
+
+/** List all tab titles in a spreadsheet. */
+function sheets_tab_titles(string $spreadsheetId): array {
+    $meta = sheets_api('GET', $spreadsheetId . '?fields=sheets.properties.title');
+    $out = [];
+    foreach ($meta['sheets'] ?? [] as $s) {
+        if (isset($s['properties']['title'])) $out[] = $s['properties']['title'];
+    }
+    return $out;
 }
 
 /** Read a range → array of rows (each row an array of string cells). */
