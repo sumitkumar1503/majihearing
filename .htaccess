@@ -4,9 +4,6 @@
 
 DirectoryIndex index.php
 
-# Pretty errors off in production (turn on temporarily while setting up)
-php_flag display_errors off
-
 # Protect sensitive files
 <FilesMatch "^(config\.php|config\.sample\.php|composer\.(json|lock))$">
     Require all denied
