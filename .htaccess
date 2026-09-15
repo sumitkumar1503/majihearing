@@ -1,0 +1,23 @@
+# Maji Hearing Aids — PHP app (Hostinger shared hosting)
+
+# Use PHP 8.1+ (Hostinger: set in hPanel > PHP Configuration if needed)
+
+DirectoryIndex index.php
+
+# Pretty errors off in production (turn on temporarily while setting up)
+php_flag display_errors off
+
+# Protect sensitive files
+<FilesMatch "^(config\.php|config\.sample\.php|composer\.(json|lock))$">
+    Require all denied
+</FilesMatch>
+
+# Block direct access to lib/ and cache/
+RewriteEngine On
+RewriteRule ^(lib|cache)/ - [F,L]
+
+# Front-controller style routing: everything goes through index.php
+# (index.php reads ?page=; direct .php files still work too)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.php?page=$1 [QSA,L]
