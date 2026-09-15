@@ -6,10 +6,14 @@ $months = last_six_months();
 $PIE = ['#818cf8','#2dd4bf','#fbbf24','#f87171','#a78bfa','#22d3ee','#ec4899','#10b981'];
 
 function stat_card(string $title, $value, string $subtitle, string $grad): string {
-    return '<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br ' . $grad . ' p-5 shadow-lg">
-        <p class="text-sm font-medium text-white/80">' . h($title) . '</p>
-        <p class="text-3xl font-extrabold text-white tracking-tight mt-1">' . h((string)$value) . '</p>
-        <p class="text-xs text-white/70 mt-1">' . h($subtitle) . '</p></div>';
+    return '<div class="group relative overflow-hidden rounded-2xl bg-gradient-to-br ' . $grad . ' p-5 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-8 translate-x-8"></div>
+        <div class="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-6 -translate-x-6"></div>
+        <div class="relative">
+          <p class="text-sm font-medium text-white/80">' . h($title) . '</p>
+          <p class="text-3xl font-extrabold text-white tracking-tight mt-1">' . h((string)$value) . '</p>
+          <p class="text-xs text-white/60 mt-1">' . h($subtitle) . '</p>
+        </div></div>';
 }
 function card_open(string $title, string $sub = ''): string {
     return '<div class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden"><div class="px-5 py-4"><h3 class="font-bold text-gray-900 text-sm">' . h($title) . '</h3>' . ($sub ? '<p class="text-[11px] text-gray-400 mt-0.5">' . h($sub) . '</p>' : '') . '</div><div class="px-4 pb-4">';
@@ -99,15 +103,15 @@ if ($role === 'admin'):
       </select>
     </form>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Revenue Trend', 'Daily sheet + HA sales (monthly)') ?><canvas id="c_rev" height="150"></canvas><?= card_close() ?>
-      <?= card_open('Sales by Branch', 'HA sales distribution') ?><canvas id="c_branch" height="150"></canvas><?= card_close() ?>
+      <?= card_open('Revenue Trend', 'Daily sheet + HA sales (monthly)') ?><div class="relative" style="height:280px"><canvas id="c_rev"</canvas></div><?= card_close() ?>
+      <?= card_open('Sales by Branch', 'HA sales distribution') ?><div class="relative" style="height:280px"><canvas id="c_branch"</canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs patients referred') ?><canvas id="c_meet" height="150"></canvas><?= card_close() ?>
-      <?= card_open('Inquiry Source', 'Where leads come from') ?><canvas id="c_src" height="150"></canvas><?= card_close() ?>
+      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs patients referred') ?><div class="relative" style="height:280px"><canvas id="c_meet"</canvas></div><?= card_close() ?>
+      <?= card_open('Inquiry Source', 'Where leads come from') ?><div class="relative" style="height:280px"><canvas id="c_src"</canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Testing Trend', 'Tests performed this month') ?><canvas id="c_test" height="150"></canvas><?= card_close() ?>
+      <?= card_open('Testing Trend', 'Tests performed this month') ?><div class="relative" style="height:280px"><canvas id="c_test"</canvas></div><?= card_close() ?>
       <?= card_open('Recent Appointments', '') ?>
         <div class="divide-y divide-gray-50">
         <?php foreach ($recent as $a): ?>
@@ -152,8 +156,8 @@ elseif ($role === 'doctor'):
       <?= stat_card('Total Appointments', $monthAppts, 'This month', 'from-emerald-500 to-green-600') ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Tests Performed', 'Top tests') ?><canvas id="c_tests" height="150"></canvas><?= card_close() ?>
-      <?= card_open('Report Status', 'Completion overview') ?><canvas id="c_reports" height="150"></canvas><?= card_close() ?>
+      <?= card_open('Tests Performed', 'Top tests') ?><div class="relative" style="height:280px"><canvas id="c_tests"</canvas></div><?= card_close() ?>
+      <?= card_open('Report Status', 'Completion overview') ?><div class="relative" style="height:280px"><canvas id="c_reports"</canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
       <?= card_open('Potential Hearing Patients', '') ?>
@@ -215,11 +219,11 @@ elseif ($role === 'marketing'):
       <?= stat_card('Incomplete Inquiries', $incomplete, 'New, Follow-up & No Answer', 'from-amber-500 to-orange-600') ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Inquiry Source', 'Where leads come from') ?><canvas id="c_src" height="150"></canvas><?= card_close() ?>
-      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs referrals (ROI)') ?><canvas id="c_meet" height="150"></canvas><?= card_close() ?>
+      <?= card_open('Inquiry Source', 'Where leads come from') ?><div class="relative" style="height:280px"><canvas id="c_src"</canvas></div><?= card_close() ?>
+      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs referrals (ROI)') ?><div class="relative" style="height:280px"><canvas id="c_meet"</canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Doctor Visits Growth Trend', 'Monthly visits') ?><canvas id="c_growth" height="150"></canvas><?= card_close() ?>
+      <?= card_open('Doctor Visits Growth Trend', 'Monthly visits') ?><div class="relative" style="height:280px"><canvas id="c_growth"</canvas></div><?= card_close() ?>
       <?= card_open('Recent Enquiries', '') ?>
         <div class="divide-y divide-gray-50">
         <?php foreach ($recentEnq as $e): ?>
@@ -261,8 +265,8 @@ else:
       <?= stat_card('Total Enquiries', count($enquiries), 'All received', 'from-rose-500 to-pink-600') ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Enquiry Pipeline', 'Status breakdown') ?><canvas id="c_enq" height="150"></canvas><?= card_close() ?>
-      <?= card_open('Stock by Brand', 'Hearing aid inventory') ?><canvas id="c_stock" height="150"></canvas><?= card_close() ?>
+      <?= card_open('Enquiry Pipeline', 'Status breakdown') ?><div class="relative" style="height:280px"><canvas id="c_enq"</canvas></div><?= card_close() ?>
+      <?= card_open('Stock by Brand', 'Hearing aid inventory') ?><div class="relative" style="height:280px"><canvas id="c_stock"</canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
       <?= card_open("Today's Appointments", '') ?>

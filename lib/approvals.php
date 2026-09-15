@@ -21,6 +21,12 @@ function apply_direct(string $module, string $action, array $assoc, string $targ
  * Returns 'applied' | 'queued'.
  */
 function submit_change(string $module, string $moduleLabel, string $action, array $assoc, string $summary, ?array $old, bool $needsApproval): string {
+    // Give creates a stable id up-front (like the Next.js app did client-side)
+    // so the pending row and the eventual committed record share one id.
+    if ($action === 'create' && empty($assoc['id'])) {
+        $c = entity_cfg(module_entity($module));
+        $assoc['id'] = $c['prefix'] . '-' . (time() . rand(100, 999));
+    }
     $targetId = $assoc['id'] ?? '';
     if (is_admin() || !$needsApproval) {
         apply_direct($module, $action, $assoc, $targetId);

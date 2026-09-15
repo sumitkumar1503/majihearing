@@ -84,7 +84,7 @@ loadNotif(); setInterval(loadNotif, 30000);
   var cfg = <?= $cfgJson ?>;
   cfg.options = cfg.options || {};
   cfg.options.responsive = true;
-  cfg.options.maintainAspectRatio = true;
+  cfg.options.maintainAspectRatio = false;
   if ((cfg.type === 'bar' || cfg.type === 'line') && !cfg.options.scales) {
     if (cfg.options.indexAxis === 'y') {
       cfg.options.scales = { y: { grid: { display: false }, border: { display: false }, ticks: { color: '#64748b' } }, x: { grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { color: '#94a3b8' }, beginAtZero: true } };
