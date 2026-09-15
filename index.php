@@ -17,6 +17,24 @@ $page = $_GET['page'] ?? 'home';
 $page = preg_replace('/[^a-z0-9_-]/', '', (string)$page);
 if ($page === '') $page = 'home';
 
+// Token-protected render self-test (temporary diagnostic).
+if ($page === 'selftest') {
+    header('Content-Type: text/plain; charset=utf-8');
+    if (!hash_equals((string)(cfg()['setup_token'] ?? ''), (string)($_GET['token'] ?? ''))) { http_response_code(403); exit('Forbidden'); }
+    $_SESSION['user'] = ['id'=>'diag','name'=>'Diag Admin','email'=>'diag@test','role'=>'admin','branch'=>'All','modules'=>[]];
+    $pages = ['dashboard','appointments','patients','doctors','enquiries','potential-ha','dr-visits','dr-payments','staff-ta','expenses','ha-stock','ha-sales','accessories','ha-repairs','attendance','daily-sheet','invoices','reports','settings','whatsapp','requests','users'];
+    foreach ($pages as $p) {
+        $f = __DIR__ . '/views/' . $p . '.php';
+        if (!file_exists($f)) { echo "MISS  $p\n"; continue; }
+        $_GET = ['page'=>$p]; ob_start(); $err=null;
+        try { include $f; } catch (\Throwable $e) { $err = get_class($e).': '.$e->getMessage().' @'.basename($e->getFile()).':'.$e->getLine(); }
+        ob_end_clean();
+        echo ($err ? "FAIL  $p -> $err" : "OK    $p") . "\n";
+    }
+    unset($_SESSION['user']);
+    exit;
+}
+
 // One-time DB setup + initial import from Google Sheets (token-protected,
 // so it works before any MySQL user rows exist to log in with).
 if ($page === 'db-setup') {
