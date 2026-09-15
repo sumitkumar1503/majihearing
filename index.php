@@ -11,11 +11,12 @@ require __DIR__ . '/lib/data.php';
 require __DIR__ . '/lib/approvals.php';
 require __DIR__ . '/lib/reports.php';
 
-$page = $_GET['page'] ?? 'dashboard';
+$page = $_GET['page'] ?? 'home';
 $page = preg_replace('/[^a-z0-9_-]/', '', (string)$page);
-if ($page === '') $page = 'dashboard';
+if ($page === '') $page = 'home';
 
-// Public routes
+// Public routes (no login required)
+if ($page === 'home') { require __DIR__ . '/views/home.php'; exit; }
 if ($page === 'login') { require __DIR__ . '/views/login.php'; exit; }
 
 // Notifications JSON feed (polled by the header bell)
