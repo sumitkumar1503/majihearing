@@ -37,6 +37,7 @@ $monthOpts = [];
 foreach ($rows as $e) { $k = month_key_of($e['date']); if ($k) $monthOpts[$k] = true; }
 krsort($monthOpts);
 $rows = array_values(array_filter($rows, function($e) use ($q,$mf){ if ($mf!=='all' && month_key_of($e['date'])!==$mf) return false; if ($q!=='' && stripos($e['staffName'],$q)===false && stripos($e['description'],$q)===false && stripos($e['branch'],$q)===false) return false; return true; }));
+sort_by_date_desc($rows, 'date');
 $monthTotal = 0; foreach ($rows as $e) if (is_current_month($e['date'])) $monthTotal += (float)$e['amount'];
 $yearTotal = 0; foreach ($rows as $e) if (substr(month_key_of($e['date']),0,4)===date('Y')) $yearTotal += (float)$e['amount'];
 $branchList = active_branch_names();

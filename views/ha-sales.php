@@ -39,7 +39,7 @@ $rows = array_values(array_filter($sales, function($s) use ($q,$branchFilter,$br
   if ($brandFilter!=='All' && stripos($s['source'],$brandFilter)===false && stripos($s['haModel'],$brandFilter)===false) return false;
   return true;
 }));
-usort($rows, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($rows, 'date');
 // Totals (filtered)
 $tCount=count($rows); $tMrp=0;$tSell=0; foreach ($rows as $r){$tMrp+=(float)$r['mrp'];$tSell+=(float)$r['sellingPrice'];}
 // This month + FY

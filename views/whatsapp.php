@@ -7,9 +7,9 @@ $reviewLink = $config['reviewLink'] ?? '';
 $q = trim($_GET['q'] ?? '');
 
 $patients = array_values(array_filter(entity_all('patients'), fn($p)=>$p['contactNo']!==''));
-usort($patients, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($patients, 'date');
 $appointments = array_values(array_filter(entity_all('appointments'), fn($a)=>$a['contactNo']!==''));
-usort($appointments, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($appointments, 'date');
 if ($q !== '') {
   $patients = array_filter($patients, fn($p)=>stripos($p['name'],$q)!==false||strpos($p['contactNo'],$q)!==false);
   $appointments = array_filter($appointments, fn($a)=>stripos($a['patientName'],$q)!==false||strpos($a['contactNo'],$q)!==false);

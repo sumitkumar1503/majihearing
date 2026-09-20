@@ -7,11 +7,11 @@ function ds_sheet_name(string $branch, string $month): string {
     return "DS-$branch-$month";
 }
 
-/** Read a daily grid (MySQL) → rows of [testName, day, amount, quantity]. */
+/** Read a daily grid (MySQL) → rows of [testName, day, amount, quantity, section]. */
 function daily_sheet_rows(string $branch, string $month): array {
     $out = [];
-    foreach (db_all("SELECT `test_name`,`day`,`amount`,`quantity` FROM `daily_entries` WHERE `branch`=? AND `month`=?", [$branch, $month]) as $r) {
-        $out[] = [$r['test_name'], $r['day'], $r['amount'], $r['quantity']];
+    foreach (db_all("SELECT `test_name`,`day`,`amount`,`quantity`,`section` FROM `daily_entries` WHERE `branch`=? AND `month`=?", [$branch, $month]) as $r) {
+        $out[] = [$r['test_name'], $r['day'], $r['amount'], $r['quantity'], $r['section'] ?? 'test'];
     }
     return $out;
 }
@@ -42,10 +42,10 @@ function report_summary(string $month, string $branch): array {
     $accessoryRevenue = 0.0;
     foreach ($branches as $b) {
         foreach (daily_sheet_rows($b, $month) as $r) {
-            $name = cell($r, 0);
             $amt = (float)cell($r, 2);
-            if (in_array($name, TEST_TYPES, true)) $testRevenue += $amt;
-            else $accessoryRevenue += $amt;
+            $isAcc = (cell($r, 4) === 'accessory') || (cell($r, 4) !== 'accessory' && !in_array(cell($r, 0), TEST_TYPES, true) && cell($r, 0) === 'Accessories');
+            if ($isAcc) $accessoryRevenue += $amt;
+            else $testRevenue += $amt;
         }
     }
     $haRevenue = 0.0; $haCount = 0;

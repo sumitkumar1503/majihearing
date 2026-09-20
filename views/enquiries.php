@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($a === 'delete' && $canDelete) { entity_delete('enquiries', $_POST['id']??''); set_flash('success','Deleted'); redirect('index.php?page=enquiries'); }
 }
 $rows = entity_all('enquiries');
-usort($rows, fn($a,$b)=>strcmp($b['enquiryDate'],$a['enquiryDate']));
+sort_by_date_desc($rows, 'enquiryDate');
 $q = trim($_GET['q'] ?? ''); $sf = $_GET['status'] ?? 'All';
 $rows = array_values(array_filter($rows, function($e) use ($q,$sf){ if ($q!=='' && stripos($e['patientName'],$q)===false && stripos($e['source'],$q)===false) return false; if ($sf!=='All' && $e['status']!==$sf) return false; return true; }));
 $rows = paginate($rows);

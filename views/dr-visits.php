@@ -29,7 +29,7 @@ $overdue = array_values(array_filter($visits, function($v) use ($isPast,$visits)
 $upcoming = array_values(array_filter($visits, fn($v)=>$v['tentativeFollowUp'] && !$isPast($v['tentativeFollowUp'])));
 $q = trim($_GET['q'] ?? '');
 $rows = array_values(array_filter($visits, fn($v)=>$q===''||stripos($v['doctorName'],$q)!==false||stripos($v['locationOfVisit'],$q)!==false));
-usort($rows, fn($a,$b)=>strcmp($b['dateOfVisit'],$a['dateOfVisit']));
+sort_by_date_desc($rows, 'dateOfVisit');
 $doctors = entity_all('doctors');
 $specialties = array_values(array_unique(array_filter(array_map(fn($d)=>$d['speciality'],$doctors))));
 $rows = paginate($rows);

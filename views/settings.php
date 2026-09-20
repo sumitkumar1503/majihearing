@@ -12,9 +12,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Brands
     if ($action === 'brand_add') { $n=trim($_POST['name']??''); if($n!=='' && !array_filter(entity_all('brands'),fn($b)=>strtolower($b['name'])===strtolower($n))){ entity_insert('brands',['name'=>$n,'active'=>'true']); set_flash('success','Brand added'); } redirect('index.php?page=settings&tab=brands'); }
     if ($action === 'brand_toggle') { $b=entity_find('brands',$_POST['id']??''); if($b){$b['active']=strtolower($b['active'])==='false'?'true':'false'; entity_update('brands',$b);} redirect('index.php?page=settings&tab=brands'); }
+    if ($action === 'brand_rename') { $t=entity_find('brands',$_POST['id']??''); $n=trim($_POST['name']??''); if($t && $n!==''){ if(array_filter(entity_all('brands'),fn($b)=>$b['id']!==$t['id'] && strtolower($b['name'])===strtolower($n))){ set_flash('error','A brand with that name already exists'); } else { $t['name']=$n; entity_update('brands',$t); set_flash('success','Brand renamed'); } } redirect('index.php?page=settings&tab=brands'); }
+    if ($action === 'brand_delete') { entity_delete('brands',$_POST['id']??''); set_flash('success','Brand deleted'); redirect('index.php?page=settings&tab=brands'); }
     // Tests
     if ($action === 'test_add') { $n=trim($_POST['name']??''); if($n!=='' && !array_filter(entity_all('tests'),fn($t)=>strtolower($t['name'])===strtolower($n))){ entity_insert('tests',['name'=>$n,'active'=>'true']); set_flash('success','Test added'); } redirect('index.php?page=settings&tab=tests'); }
     if ($action === 'test_toggle') { $t=entity_find('tests',$_POST['id']??''); if($t){$t['active']=strtolower($t['active'])==='false'?'true':'false'; entity_update('tests',$t);} redirect('index.php?page=settings&tab=tests'); }
+    if ($action === 'test_rename') { $t=entity_find('tests',$_POST['id']??''); $n=trim($_POST['name']??''); if($t && $n!==''){ if(array_filter(entity_all('tests'),fn($b)=>$b['id']!==$t['id'] && strtolower($b['name'])===strtolower($n))){ set_flash('error','A test with that name already exists'); } else { $t['name']=$n; entity_update('tests',$t); set_flash('success','Test renamed'); } } redirect('index.php?page=settings&tab=tests'); }
+    if ($action === 'test_delete') { entity_delete('tests',$_POST['id']??''); set_flash('success','Test deleted'); redirect('index.php?page=settings&tab=tests'); }
+    // General settings
+    if ($action === 'general_save') { set_config_value('clinicName', trim($_POST['clinicName']??'Maji Hearing Aids Centre')); set_config_value('workingHours', trim($_POST['workingHours']??'')); set_flash('success','General settings saved'); redirect('index.php?page=settings&tab=general'); }
     // Services (no id: match category+description)
     if ($action === 'service_save') {
         $cat=$_POST['category']??'Service'; $desc=trim($_POST['description']??''); $price=$_POST['price']??'0';
@@ -82,14 +88,32 @@ require __DIR__ . '/../partials/top.php';
   <h2 class="text-lg font-semibold text-gray-900"><?= $isBrand?'Hearing Aid Brands':'Medical Tests' ?></h2>
   <p class="text-sm text-gray-500 mb-4"><?= $isBrand?'Add or discontinue brands. Discontinued brands are hidden from stock/sales dropdowns.':'Manage tests shown on the Patient &amp; Appointment dashboards. Discontinued tests are hidden.' ?></p>
   <form method="post" class="flex gap-2 max-w-md mb-4"><input type="hidden" name="action" value="<?= $pref ?>_add"><input type="text" name="name" placeholder="New <?= $pref ?> name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">+ Add</button></form>
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
     <?php foreach ($list as $b): $act=strtolower($b['active'])!=='false'; ?>
-      <div class="flex items-center justify-between gap-2 rounded-lg border p-3 <?= $act?'border-gray-200 bg-white':'border-gray-100 bg-gray-50' ?>">
-        <span class="text-sm font-medium truncate <?= $act?'text-gray-900':'text-gray-400 line-through' ?>"><?= h($b['name']) ?></span>
-        <form method="post"><input type="hidden" name="action" value="<?= $pref ?>_toggle"><input type="hidden" name="id" value="<?= h($b['id']) ?>"><button class="text-xs font-medium <?= $act?'text-red-500':'text-green-600' ?>"><?= $act?'Discontinue':'Reactivate' ?></button></form>
+      <div class="rounded-lg border p-3 <?= $act?'border-gray-200 bg-white':'border-gray-100 bg-gray-50' ?>">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-sm font-medium truncate <?= $act?'text-gray-900':'text-gray-400 line-through' ?>"><?= h($b['name']) ?></span>
+          <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium <?= $act?'bg-green-100 text-green-700':'bg-red-100 text-red-700' ?>"><?= $act?'Active':'Off' ?></span>
+        </div>
+        <div class="mt-2 flex items-center gap-3 border-t border-gray-100 pt-2 text-xs font-medium">
+          <button type="button" onclick="renameItem('<?= $pref ?>','<?= h($b['id']) ?>',<?= h(json_encode($b['name'])) ?>)" class="text-indigo-600 hover:text-indigo-800">Edit</button>
+          <form method="post"><input type="hidden" name="action" value="<?= $pref ?>_toggle"><input type="hidden" name="id" value="<?= h($b['id']) ?>"><button class="<?= $act?'text-amber-600':'text-green-600' ?>"><?= $act?'Discontinue':'Reactivate' ?></button></form>
+          <form method="post" onsubmit="return confirm('Delete this <?= $pref ?> permanently?')"><input type="hidden" name="action" value="<?= $pref ?>_delete"><input type="hidden" name="id" value="<?= h($b['id']) ?>"><button class="text-red-500 hover:text-red-700">Delete</button></form>
+        </div>
       </div>
     <?php endforeach; if(!$list): ?><p class="col-span-full text-center py-8 text-gray-500">None configured</p><?php endif; ?>
   </div>
+  <form method="post" id="renameForm" class="hidden"><input type="hidden" name="action" id="rn_action"><input type="hidden" name="id" id="rn_id"><input type="hidden" name="name" id="rn_name"></form>
+  <script>
+  function renameItem(pref, id, current){
+    var v = prompt('Rename '+pref+':', current);
+    if(v===null) return; v=v.trim(); if(v==='') return;
+    document.getElementById('rn_action').value = pref+'_rename';
+    document.getElementById('rn_id').value = id;
+    document.getElementById('rn_name').value = v;
+    document.getElementById('renameForm').submit();
+  }
+  </script>
 
 <?php elseif ($tab === 'whatsapp'): ?>
   <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-6 max-w-2xl">
@@ -185,10 +209,12 @@ require __DIR__ . '/../partials/top.php';
   </div>
 
 <?php else: ?>
-  <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4 max-w-md">
+  <form method="post" class="bg-white rounded-xl border border-gray-200 p-6 space-y-4 max-w-md">
     <h2 class="text-lg font-semibold text-gray-900">General Settings</h2>
-    <div><label class="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label><input type="text" value="Maji Hearing Aids Centre" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></div>
-    <div><label class="block text-sm font-medium text-gray-700 mb-1">Working Hours</label><input type="text" value="10:30 AM - 2:00 PM" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></div>
-  </div>
+    <input type="hidden" name="action" value="general_save">
+    <div><label class="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label><input type="text" name="clinicName" value="<?= h($config['clinicName'] ?? 'Maji Hearing Aids Centre') ?>" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></div>
+    <div><label class="block text-sm font-medium text-gray-700 mb-1">Working Hours</label><input type="text" name="workingHours" value="<?= h($config['workingHours'] ?? '10:30 AM - 2:00 PM') ?>" placeholder="e.g. 10:30 AM - 2:00 PM" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></div>
+    <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Save General Settings</button>
+  </form>
 <?php endif; ?>
 <?php require __DIR__ . '/../partials/bottom.php';

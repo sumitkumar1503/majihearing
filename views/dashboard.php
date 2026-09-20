@@ -77,7 +77,7 @@ if ($role === 'admin'):
     $totalRevenue = $dailyPart + $haRevMonth;
 
     $recent = $fAppts;
-    usort($recent, fn($a, $b) => strcmp($b['date'], $a['date']));
+    sort_by_date_desc($recent, 'date');
     $recent = array_slice($recent, 0, 6);
 
     add_chart('c_rev', ['type'=>'line','data'=>['labels'=>array_column($revTrend,'label'),'datasets'=>[['label'=>'Revenue','data'=>array_column($revTrend,'value'),'borderColor'=>'#10b981','backgroundColor'=>'rgba(16,185,129,.15)','fill'=>true,'tension'=>.35]]],'options'=>['plugins'=>['legend'=>['display'=>false]]]]);
@@ -103,21 +103,21 @@ if ($role === 'admin'):
       </select>
     </form>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Revenue Trend', 'Daily sheet + HA sales (monthly)') ?><div class="relative" style="height:280px"><canvas id="c_rev"</canvas></div><?= card_close() ?>
-      <?= card_open('Sales by Branch', 'HA sales distribution') ?><div class="relative" style="height:280px"><canvas id="c_branch"</canvas></div><?= card_close() ?>
+      <?= card_open('Revenue Trend', 'Daily sheet + HA sales (monthly)') ?><div class="relative" style="height:280px"><canvas id="c_rev"></canvas></div><?= card_close() ?>
+      <?= card_open('Sales by Branch', 'HA sales distribution') ?><div class="relative" style="height:280px"><canvas id="c_branch"></canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs patients referred') ?><div class="relative" style="height:280px"><canvas id="c_meet"</canvas></div><?= card_close() ?>
-      <?= card_open('Inquiry Source', 'Where leads come from') ?><div class="relative" style="height:280px"><canvas id="c_src"</canvas></div><?= card_close() ?>
+      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs patients referred') ?><div class="relative" style="height:280px"><canvas id="c_meet"></canvas></div><?= card_close() ?>
+      <?= card_open('Inquiry Source', 'Where leads come from') ?><div class="relative" style="height:280px"><canvas id="c_src"></canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Testing Trend', 'Tests performed this month') ?><div class="relative" style="height:280px"><canvas id="c_test"</canvas></div><?= card_close() ?>
+      <?= card_open('Testing Trend', 'Tests performed this month') ?><div class="relative" style="height:280px"><canvas id="c_test"></canvas></div><?= card_close() ?>
       <?= card_open('Recent Appointments', '') ?>
         <div class="divide-y divide-gray-50">
         <?php foreach ($recent as $a): ?>
           <div class="flex items-center justify-between py-2.5">
             <div><p class="text-sm font-semibold text-gray-800"><?= h($a['patientName']) ?></p><p class="text-[11px] text-gray-400"><?= h($a['test']) ?> · <?= h(format_date($a['date'], 'd M')) ?></p></div>
-            <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gray-50 text-gray-600 border"><?= h($a['reportStatus'] ?: 'N/A') ?></span>
+            <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold <?= pill($a['reportStatus'] ?: 'N/A') ?>"><?= h($a['reportStatus'] ?: 'N/A') ?></span>
           </div>
         <?php endforeach; if (!$recent): ?><p class="py-6 text-center text-sm text-gray-300">No appointments</p><?php endif; ?>
         </div>
@@ -156,8 +156,8 @@ elseif ($role === 'doctor'):
       <?= stat_card('Total Appointments', $monthAppts, 'This month', 'from-emerald-500 to-green-600') ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Tests Performed', 'Top tests') ?><div class="relative" style="height:280px"><canvas id="c_tests"</canvas></div><?= card_close() ?>
-      <?= card_open('Report Status', 'Completion overview') ?><div class="relative" style="height:280px"><canvas id="c_reports"</canvas></div><?= card_close() ?>
+      <?= card_open('Tests Performed', 'Top tests') ?><div class="relative" style="height:280px"><canvas id="c_tests"></canvas></div><?= card_close() ?>
+      <?= card_open('Report Status', 'Completion overview') ?><div class="relative" style="height:280px"><canvas id="c_reports"></canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
       <?= card_open('Potential Hearing Patients', '') ?>
@@ -205,7 +205,7 @@ elseif ($role === 'marketing'):
     add_chart('c_meet', ['type'=>'bar','data'=>['labels'=>$mlabels,'datasets'=>[['label'=>'Doctor Visits','data'=>$visits,'backgroundColor'=>'#6366f1'],['label'=>'Patients Referred','data'=>$refs,'backgroundColor'=>'#10b981']]]]);
     add_chart('c_growth', ['type'=>'line','data'=>['labels'=>$mlabels,'datasets'=>[['label'=>'Visits','data'=>$visits,'borderColor'=>'#6366f1','backgroundColor'=>'rgba(99,102,241,.15)','fill'=>true,'tension'=>.35]]],'options'=>['plugins'=>['legend'=>['display'=>false]]]]);
 
-    $recentEnq = $enquiries; usort($recentEnq, fn($a,$b)=>strcmp($b['enquiryDate'],$a['enquiryDate'])); $recentEnq = array_slice($recentEnq,0,6);
+    $recentEnq = $enquiries; sort_by_date_desc($recentEnq, 'enquiryDate'); $recentEnq = array_slice($recentEnq,0,6);
 
     require __DIR__ . '/../partials/top.php';
     ?>
@@ -219,11 +219,11 @@ elseif ($role === 'marketing'):
       <?= stat_card('Incomplete Inquiries', $incomplete, 'New, Follow-up & No Answer', 'from-amber-500 to-orange-600') ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Inquiry Source', 'Where leads come from') ?><div class="relative" style="height:280px"><canvas id="c_src"</canvas></div><?= card_close() ?>
-      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs referrals (ROI)') ?><div class="relative" style="height:280px"><canvas id="c_meet"</canvas></div><?= card_close() ?>
+      <?= card_open('Inquiry Source', 'Where leads come from') ?><div class="relative" style="height:280px"><canvas id="c_src"></canvas></div><?= card_close() ?>
+      <?= card_open('Doctor Meet vs Doctor Referral', 'Monthly visits vs referrals (ROI)') ?><div class="relative" style="height:280px"><canvas id="c_meet"></canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Doctor Visits Growth Trend', 'Monthly visits') ?><div class="relative" style="height:280px"><canvas id="c_growth"</canvas></div><?= card_close() ?>
+      <?= card_open('Doctor Visits Growth Trend', 'Monthly visits') ?><div class="relative" style="height:280px"><canvas id="c_growth"></canvas></div><?= card_close() ?>
       <?= card_open('Recent Enquiries', '') ?>
         <div class="divide-y divide-gray-50">
         <?php foreach ($recentEnq as $e): ?>
@@ -265,8 +265,8 @@ else:
       <?= stat_card('Total Enquiries', count($enquiries), 'All received', 'from-rose-500 to-pink-600') ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <?= card_open('Enquiry Pipeline', 'Status breakdown') ?><div class="relative" style="height:280px"><canvas id="c_enq"</canvas></div><?= card_close() ?>
-      <?= card_open('Stock by Brand', 'Hearing aid inventory') ?><div class="relative" style="height:280px"><canvas id="c_stock"</canvas></div><?= card_close() ?>
+      <?= card_open('Enquiry Pipeline', 'Status breakdown') ?><div class="relative" style="height:280px"><canvas id="c_enq"></canvas></div><?= card_close() ?>
+      <?= card_open('Stock by Brand', 'Hearing aid inventory') ?><div class="relative" style="height:280px"><canvas id="c_stock"></canvas></div><?= card_close() ?>
     </div>
     <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
       <?= card_open("Today's Appointments", '') ?>

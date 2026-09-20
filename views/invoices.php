@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($a === 'delete' && $canDelete) { entity_delete('invoices', $_POST['id']??''); set_flash('success','Deleted'); redirect('index.php?page=invoices'); }
 }
 $rows = entity_all('invoices');
-usort($rows, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($rows, 'date');
 $q = trim($_GET['q'] ?? '');
 if ($q !== '') $rows = array_values(array_filter($rows, fn($i)=>stripos($i['patientName'],$q)!==false||stripos($i['invoiceNo'],$q)!==false));
 $branchList = active_branch_names();

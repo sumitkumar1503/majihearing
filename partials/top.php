@@ -5,6 +5,13 @@ $role = current_role();
 $theme = role_theme($role);
 $currentSlug = $_GET['page'] ?? 'dashboard';
 $flashes = take_flash();
+
+// Pending-action counts for sidebar badges (Requests + Attendance).
+$pendingReq = 0; $pendingAtt = 0;
+try { $pendingReq = pending_approvals_count(); } catch (\Throwable $e) {}
+if (is_admin()) {
+    try { foreach (entity_all('attendance') as $r) { if (strtolower($r['status'] ?? '') !== 'approved') $pendingAtt++; } } catch (\Throwable $e) {}
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -34,6 +41,8 @@ $flashes = take_flash();
                   <?= $active ? $theme['active'] . ' text-white shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white' ?>">
           <?= nav_icon($item['key']) ?>
           <span class="truncate"><?= h($item['label']) ?></span>
+          <?php $badge = $item['slug'] === 'requests' ? $pendingReq : ($item['slug'] === 'attendance' ? $pendingAtt : 0); ?>
+          <?php if ($badge > 0): ?><span class="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white"><?= $badge ?></span><?php endif; ?>
         </a>
       <?php endforeach; ?>
     </nav>

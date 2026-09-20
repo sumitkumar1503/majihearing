@@ -57,13 +57,13 @@ for ($k = 0; $k < max(0, 6 - count($items)); $k++) {
   .patient-value { margin-left: 6px; padding-bottom: 2px; }
   .patient-dots { flex: 1; border-bottom: 1px dotted #666; margin-left: 6px; padding-bottom: 2px; }
   .items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-  .items-table th { background: #CC0000; color: #fff; font-weight: 700; font-size: 11px; padding: 8px; border: 1px solid #333; text-transform: uppercase; letter-spacing: 0.5px; }
+  .items-table th { background: #0f3460; color: #fff; font-weight: 700; font-size: 11px; padding: 8px; border: 1px solid #333; text-transform: uppercase; letter-spacing: 0.5px; }
   .items-table td { font-size: 11px; }
   .totals-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-top: 4px; }
   .rupees-words { font-size: 11px; flex: 1; margin-right: 20px; }
   .grand-total-box { text-align: right; min-width: 200px; }
   .grand-total-label { font-size: 13px; font-weight: 700; }
-  .grand-total-amount { font-size: 16px; font-weight: 700; color: #CC0000; }
+  .grand-total-amount { font-size: 16px; font-weight: 700; color: #0f3460; }
   .discount-line { display: flex; justify-content: flex-end; margin-bottom: 4px; font-size: 11px; gap: 10px; }
   .instructions { margin-top: 14px; border-top: 2px solid #333; padding-top: 10px; }
   .instructions-title { font-size: 11px; font-weight: 700; text-decoration: underline; text-align: center; margin-bottom: 8px; letter-spacing: 0.5px; }

@@ -35,6 +35,7 @@ $staffNames = array_values(array_unique(array_filter(array_map(fn($e)=>$e['staff
 $q = trim($_GET['q'] ?? '');
 $rows = array_values(array_filter($rows, function($e) use ($q,$sel,$staffFilter){ if ($q!=='' && stripos($e['place'],$q)===false && stripos($e['doctorName'],$q)===false) return false; if ($sel && $e['month']!==$sel) return false; if ($staffFilter!=='All' && $e['staffName']!==$staffFilter) return false; return true; }));
 $monthTotal = 0; foreach ($rows as $e) $monthTotal += (float)$e['totalAmount'];
+sort_by_date_desc($rows, 'date');
 $users = array_map(fn($u)=>$u['name'], entity_all('users'));
 $rows = paginate($rows);
 require __DIR__ . '/../partials/top.php';

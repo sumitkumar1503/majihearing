@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $items = entity_all('accessories');
 $q = trim($_GET['q'] ?? '');
 $rows = array_values(array_filter($items, fn($i)=>$q===''||stripos($i['name'],$q)!==false||stripos($i['model'],$q)!==false||stripos($i['branch'],$q)!==false));
-usort($rows, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($rows, 'date');
 $inv = [];
 foreach ($items as $i) { $n=$i['name']; if(!isset($inv[$n]))$inv[$n]=['in'=>0,'sold'=>0,'price'=>0]; if(($i['type']??'')==='Sold')$inv[$n]['sold']+=(int)$i['quantity']; else $inv[$n]['in']+=(int)$i['quantity']; if($i['price'])$inv[$n]['price']=$i['price']; }
 ksort($inv);

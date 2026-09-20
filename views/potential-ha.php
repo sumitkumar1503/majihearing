@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($a === 'delete' && $canDelete) { entity_delete('potential-ha', $_POST['id']??''); set_flash('success','Deleted'); redirect('index.php?page=potential-ha'); }
 }
 $rows = entity_all('potential-ha');
-usort($rows, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($rows, 'date');
 $q = trim($_GET['q'] ?? '');
 if ($q !== '') $rows = array_values(array_filter($rows, fn($p) => stripos($p['name'],$q)!==false || strpos($p['contactNo'],$q)!==false));
 $branchList = active_branch_names();

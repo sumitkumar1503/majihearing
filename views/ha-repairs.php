@@ -26,6 +26,7 @@ $rows = array_values(array_filter($repairs, function($r) use ($q,$branchFilter,$
   if ($statusFilter!=='All' && $r['status']!==$statusFilter) return false;
   return true;
 }));
+sort_by_date_desc($rows, 'date');
 $repairsThisMonth = count(array_filter($repairs, fn($r)=>is_current_month($r['date'])));
 $pendingAll = count(array_filter($repairs, fn($r)=>$r['status']==='Pending'));
 $brands = active_brand_names(); $branchList = active_branch_names();

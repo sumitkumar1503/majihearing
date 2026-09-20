@@ -24,6 +24,7 @@ $totalAmount = 0; $totalPatients = 0;
 foreach ($rows as $p) { $totalAmount += (float)$p['amount']; $totalPatients += (int)$p['noOfPatients']; }
 $monthly = []; $yearly = [];
 foreach ($rows as $p) { $t = safe_parse_date($p['date']); if ($t) { $monthly[$t->format('M Y')] = ($monthly[$t->format('M Y')]??0)+(float)$p['amount']; $yearly[$t->format('Y')] = ($yearly[$t->format('Y')]??0)+(float)$p['amount']; } }
+sort_by_date_desc($rows, 'date');
 $rows = paginate($rows);
 require __DIR__ . '/../partials/top.php';
 ?>

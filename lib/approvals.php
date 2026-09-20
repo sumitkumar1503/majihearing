@@ -55,11 +55,12 @@ function submit_change(string $module, string $moduleLabel, string $action, arra
 function save_daily_sheet(string $branch, string $month, array $entries): void {
     db_exec("DELETE FROM `daily_entries` WHERE `branch`=? AND `month`=?", [$branch, $month]);
     foreach ($entries as $e) {
+        $section = ($e['section'] ?? 'test') === 'accessory' ? 'accessory' : 'test';
         db_exec(
-            "INSERT INTO `daily_entries` (`branch`,`month`,`test_name`,`day`,`amount`,`quantity`) VALUES (?,?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE `amount`=VALUES(`amount`),`quantity`=VALUES(`quantity`)",
-            [$branch, $month, $e['testName'], (int)$e['day'], (float)$e['amount'], (float)$e['quantity']],
-            'sssidd'
+            "INSERT INTO `daily_entries` (`branch`,`month`,`test_name`,`day`,`amount`,`quantity`,`section`) VALUES (?,?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE `amount`=VALUES(`amount`),`quantity`=VALUES(`quantity`),`section`=VALUES(`section`)",
+            [$branch, $month, $e['testName'], (int)$e['day'], (float)$e['amount'], (float)$e['quantity'], $section],
+            'sssidds'
         );
     }
 }

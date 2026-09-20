@@ -70,7 +70,7 @@ $todayTotal = $todayRec ? att_total($todayRec,$SESS) : '';
 $dateFrom = $_GET['from'] ?? date('Y-m-01'); $dateTo = $_GET['to'] ?? $today; $q = trim($_GET['q'] ?? '');
 $visible = $admin ? $records : $myRecords;
 $rows = array_values(array_filter($visible, function($r) use ($q,$dateFrom,$dateTo){ if($q!=='' && stripos($r['userName'],$q)===false && strpos($r['date'],$q)===false && stripos($r['status'],$q)===false) return false; if($r['date']<$dateFrom||$r['date']>$dateTo) return false; return true; }));
-usort($rows, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($rows, 'date');
 $presentToday = count(array_filter($records, fn($r)=>$r['date']===$today));
 $pendingAdmin = count(array_filter($records, fn($r)=>($r['status']??'')!=='Approved'));
 $appr = array_filter($records, fn($r)=>$r['status']==='Approved' && $r['totalHours']);

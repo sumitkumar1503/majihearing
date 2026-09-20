@@ -39,7 +39,7 @@ $rows = array_values(array_filter($stock, function($s) use ($q,$brandFilter,$bra
   if ($availFilter==='Sold' && $s['soldDate']==='') return false;
   return true;
 }));
-usort($rows, fn($a,$b)=>strcmp($b['date'],$a['date']));
+sort_by_date_desc($rows, 'date');
 $brands = active_brand_names();
 $branchList = active_branch_names();
 $rows = paginate($rows);

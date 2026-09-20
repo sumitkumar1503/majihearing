@@ -28,7 +28,7 @@ function db_ensure_schema(mysqli $conn): void {
     static $done = false;
     if ($done) return;
     $done = true;
-    $marker = __DIR__ . '/../cache/schema_v1.ok';
+    $marker = __DIR__ . '/../cache/schema_v2.ok';
     if (file_exists($marker)) return;
 
     foreach (entities() as $name => $c) {
@@ -52,8 +52,16 @@ function db_ensure_schema(mysqli $conn): void {
         `day` INT NOT NULL,
         `amount` DOUBLE NOT NULL DEFAULT 0,
         `quantity` DOUBLE NOT NULL DEFAULT 0,
+        `section` VARCHAR(20) NOT NULL DEFAULT 'test',
         UNIQUE KEY `cell` (`branch`,`month`,`test_name`,`day`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Add `section` to pre-existing daily_entries tables (guarded — no IF NOT EXISTS in MySQL 8).
+    $col = $conn->query("SELECT COUNT(*) c FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='daily_entries' AND column_name='section'");
+    if ($col && ($col->fetch_assoc()['c'] ?? '1') == '0') {
+        $conn->query("ALTER TABLE `daily_entries` ADD COLUMN `section` VARCHAR(20) NOT NULL DEFAULT 'test'");
+    }
+    // Tag legacy accessory rows correctly (imported data defaulted to 'test').
+    $conn->query("UPDATE `daily_entries` SET `section`='accessory' WHERE `test_name`='Accessories'");
 
     // Key/value app config (whatsapp messages, sync settings, etc.)
     $conn->query("CREATE TABLE IF NOT EXISTS `app_config` (
@@ -71,6 +79,7 @@ function db_ensure_schema(mysqli $conn): void {
 
     @mkdir(__DIR__ . '/../cache', 0775, true);
     @file_put_contents($marker, date('c'));
+    @unlink(__DIR__ . '/../cache/schema_v1.ok');
 }
 
 /** SELECT → array of assoc rows. */
