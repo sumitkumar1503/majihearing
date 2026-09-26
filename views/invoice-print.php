@@ -89,7 +89,7 @@ for ($k = 0; $k < max(0, 6 - count($items)); $k++) {
       51, Dr. G. C. Goswami Street, Near Railway Station (Goswami Para).<br>
       <div class="branch-name" style="margin-top:5px;">Konnagar Branch</div>
       19A, S K Deb Street, Konnagar<br>
-      <div style="margin-top:5px;">Call us at: 8859997977 / 9831493073</div>
+      <div style="margin-top:5px;">Call us at: 8599979977 / 9831493073</div>
       WhatsApp us at: 7439663366<br>
       Email us at: majiheaingaidscentre@gmail.com
     </div>

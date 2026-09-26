@@ -6,8 +6,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($a === 'save') {
         $items = json_decode($_POST['items'] ?? '[]', true); if (!is_array($items)) $items = [];
         $subtotal = 0; foreach ($items as $it) $subtotal += (float)($it['total'] ?? 0);
-        $discount = (float)($_POST['discount'] ?? 0);
-        $assoc = ['id'=>trim($_POST['id']??''),'invoiceNo'=>trim($_POST['invoiceNo']??''),'date'=>$_POST['date']??'','patientName'=>trim($_POST['patientName']??''),'age'=>$_POST['age']??'','address'=>$_POST['address']??'','phoneNumber'=>$_POST['phoneNumber']??'','items'=>$items,'subtotal'=>$subtotal,'discount'=>$discount,'total'=>$subtotal-$discount,'paymentMode'=>$_POST['paymentMode']??'Cash','branch'=>$_POST['branch']??''];
+        // Total is directly editable; discount is derived so subtotal - discount = total on the print.
+        $total = (isset($_POST['total']) && $_POST['total'] !== '') ? (float)$_POST['total'] : $subtotal - (float)($_POST['discount'] ?? 0);
+        $discount = $subtotal - $total;
+        $assoc = ['id'=>trim($_POST['id']??''),'invoiceNo'=>trim($_POST['invoiceNo']??''),'date'=>$_POST['date']??'','patientName'=>trim($_POST['patientName']??''),'age'=>$_POST['age']??'','address'=>$_POST['address']??'','phoneNumber'=>$_POST['phoneNumber']??'','items'=>$items,'subtotal'=>$subtotal,'discount'=>$discount,'total'=>$total,'paymentMode'=>$_POST['paymentMode']??'Cash','branch'=>$_POST['branch']??''];
         if ($assoc['patientName']==='' || $assoc['invoiceNo']==='') { set_flash('error','Patient name and invoice no are required'); redirect('index.php?page=invoices'); }
         if ($assoc['id']==='') { entity_insert('invoices', $assoc); set_flash('success','Invoice created'); }
         else { entity_update('invoices', $assoc); set_flash('success','Invoice updated'); }
@@ -57,8 +59,9 @@ require __DIR__ . '/../partials/top.php';
     <button type="button" onclick="addItem()" class="mt-2 text-sm text-indigo-600 hover:underline">+ Add Item</button>
     <div class="flex flex-col items-end gap-2 mt-4">
       <div class="flex items-center gap-4"><span class="text-sm text-gray-600">Subtotal:</span><span class="font-medium" id="subT">₹0</span></div>
-      <div class="flex items-center gap-4"><span class="text-sm text-gray-600">Discount (₹):</span><input type="number" name="discount" id="f_discount" value="0" oninput="recalc()" class="w-28 rounded-lg border border-gray-300 px-3 py-1 text-sm"></div>
-      <div class="flex items-center gap-4"><span class="text-lg font-semibold">Grand Total:</span><span class="text-xl font-bold text-green-600" id="grandT">₹0</span></div>
+      <div class="flex items-center gap-4"><span class="text-sm text-gray-600">Discount (₹):</span><input type="number" name="discount" id="f_discount" value="0" oninput="onDiscountEdit()" class="w-32 rounded-lg border border-gray-300 px-3 py-1 text-sm text-right"></div>
+      <div class="flex items-center gap-4"><label class="text-lg font-semibold" for="f_total">Grand Total (₹):</label><input type="number" step="any" name="total" id="f_total" value="0" oninput="onTotalEdit()" class="w-40 rounded-lg border border-gray-300 px-3 py-1.5 text-right text-xl font-bold text-green-600"></div>
+      <p class="text-[11px] text-gray-400">Edit Grand Total directly to round off; discount adjusts automatically.</p>
     </div>
     <div class="flex items-center gap-4 mt-4"><label class="text-sm font-medium text-gray-700">Payment Mode:</label><select name="paymentMode" id="f_paymentMode" class="rounded-lg border border-gray-300 px-3 py-2 text-sm"><option>Cash</option><option>Online</option><option>Cheque</option></select></div>
     <div class="mt-6 flex justify-end gap-3"><button type="button" onclick="closeModal('modal')" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700">Cancel</button><button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">Save</button></div>
@@ -82,7 +85,10 @@ function renderItems(){
 }
 function pick(idx,val){ var s=SERVICES.find(function(x){return x[1]===val;}); if(s){items[idx].description=s[1];items[idx].price=s[2];} else {items[idx].description='';} renderItems(); recalc(); }
 function addItem(){ items.push({item:'Service',description:'',quantity:1,price:0}); renderItems(); recalc(); }
-function recalc(){ var sub=0; items.forEach(function(it){it.total=(it.quantity||0)*(it.price||0); sub+=it.total;}); var disc=+document.getElementById('f_discount').value||0; document.getElementById('subT').textContent='₹'+sub.toLocaleString(); document.getElementById('grandT').textContent='₹'+(sub-disc).toLocaleString(); }
+function invSubtotal(){ var sub=0; items.forEach(function(it){it.total=(it.quantity||0)*(it.price||0); sub+=it.total;}); return sub; }
+function recalc(){ var sub=invSubtotal(); document.getElementById('subT').textContent='₹'+sub.toLocaleString(); var disc=+document.getElementById('f_discount').value||0; document.getElementById('f_total').value=(sub-disc); }
+function onDiscountEdit(){ var sub=invSubtotal(); document.getElementById('subT').textContent='₹'+sub.toLocaleString(); var disc=+document.getElementById('f_discount').value||0; document.getElementById('f_total').value=(sub-disc); }
+function onTotalEdit(){ var sub=invSubtotal(); document.getElementById('subT').textContent='₹'+sub.toLocaleString(); var total=+document.getElementById('f_total').value||0; document.getElementById('f_discount').value=(sub-total); }
 function prepItems(){ items.forEach(function(it){it.total=(it.quantity||0)*(it.price||0);}); document.getElementById('f_items').value=JSON.stringify(items); return true; }
 function openNew(){ resetForm(); document.getElementById('modalTitle').textContent='Create Invoice'; document.getElementById('f_invoiceNo').value='INV-'+String(Date.now()).slice(-6); document.getElementById('f_date').value=new Date().toISOString().slice(0,10); document.getElementById('f_discount').value=0; items=[{item:'Service',description:'',quantity:1,price:0}]; renderItems(); recalc(); openModal('modal'); }
 function openEdit(o){ resetForm(); fillForm(o); document.getElementById('modalTitle').textContent='Edit Invoice'; document.getElementById('f_discount').value=o.discount||0; items=(o.items&&o.items.length)?o.items.map(function(x){return {item:x.item||'Service',description:x.description||'',quantity:+x.quantity||1,price:+x.price||0};}):[{item:'Service',description:'',quantity:1,price:0}]; renderItems(); recalc(); openModal('modal'); }

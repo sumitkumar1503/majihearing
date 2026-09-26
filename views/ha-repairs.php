@@ -1,7 +1,7 @@
 <?php
 $title = 'HA Repairs';
 $canDelete = is_admin();
-$SERVICE_TYPES = ['Repair Within Warranty','Repair Non-Warranty','Full Soft Mold','Half Soft Mold','Tip-Type Soft Mold','Hard Mold','Retubing','RIC Mold','Instant Fit CIC','Custom CIC','ITC/ITE','Reselling','Pulling Thread Repair','Other'];
+$SERVICE_TYPES = array_merge(service_type_list(), ['Other']);
 $STATUS_OPTIONS = ['Pending','In Progress','Completed','Incomplete'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $a = $_POST['action'] ?? '';

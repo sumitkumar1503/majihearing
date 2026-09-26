@@ -229,6 +229,20 @@ function services_all(): array {
     return db_all("SELECT `id`,`category`,`description`,`price` FROM `services` ORDER BY `category`,`description`");
 }
 
+/** Repair service types (managed in Settings, stored in app_config as JSON). */
+function service_type_list(): array {
+    $raw = config_value('serviceTypes', '');
+    $list = $raw ? json_decode($raw, true) : null;
+    if (!is_array($list) || !$list) {
+        $list = ['Repair Within Warranty','Repair Non-Warranty','Full Soft Mold','Half Soft Mold','Tip-Type Soft Mold','Hard Mold','Retubing','RIC Mold','Instant Fit CIC','Custom CIC','ITC/ITE','Reselling','Pulling Thread Repair'];
+    }
+    return array_values(array_filter(array_map('strval', $list), fn($v) => trim($v) !== ''));
+}
+
+function set_service_types(array $list): void {
+    set_config_value('serviceTypes', json_encode(array_values($list)));
+}
+
 /** Upsert a service, matching an existing row by original category+description. */
 function service_save(string $category, string $description, string $price, string $origCat = '', string $origDesc = ''): void {
     $existing = db_row("SELECT `id` FROM `services` WHERE `category`=? AND `description`=? LIMIT 1", [$origCat, $origDesc]);

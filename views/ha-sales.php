@@ -32,11 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 $sales = entity_all('ha-sales');
-$q = trim($_GET['q'] ?? ''); $branchFilter = $_GET['branchf'] ?? 'All'; $brandFilter = $_GET['brandf'] ?? 'All';
-$rows = array_values(array_filter($sales, function($s) use ($q,$branchFilter,$brandFilter){
+$q = trim($_GET['q'] ?? ''); $branchFilter = $_GET['branchf'] ?? 'All'; $brandFilter = $_GET['brandf'] ?? 'All'; $payFilter = $_GET['payf'] ?? 'All';
+$rows = array_values(array_filter($sales, function($s) use ($q,$branchFilter,$brandFilter,$payFilter){
   if ($q!=='' && stripos($s['name'],$q)===false && strpos($s['contactNo'],$q)===false && stripos($s['haModel'],$q)===false) return false;
   if ($branchFilter!=='All' && $s['branch']!==$branchFilter) return false;
   if ($brandFilter!=='All' && stripos($s['source'],$brandFilter)===false && stripos($s['haModel'],$brandFilter)===false) return false;
+  if ($payFilter!=='All' && ($s['paymentStatus'] ?: 'Completed') !== $payFilter) return false;
   return true;
 }));
 sort_by_date_desc($rows, 'date');
@@ -70,6 +71,7 @@ require __DIR__ . '/../partials/top.php';
   <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search name, contact, model..." class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
   <select name="branchf" class="rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="All">All Branches</option><?php foreach ($branchList as $b): ?><option <?= $branchFilter===$b?'selected':'' ?>><?= h($b) ?></option><?php endforeach; ?></select>
   <select name="brandf" class="rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="All">All Brands</option><?php foreach ($brands as $b): ?><option <?= $brandFilter===$b?'selected':'' ?>><?= h($b) ?></option><?php endforeach; ?></select>
+  <select name="payf" class="rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="All">All Payments</option><?php foreach (['Completed','Due','Advance'] as $ps): ?><option <?= $payFilter===$ps?'selected':'' ?>><?= $ps ?></option><?php endforeach; ?></select>
   <button class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium">Filter</button>
 </form>
 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 text-sm">

@@ -19,6 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'test_toggle') { $t=entity_find('tests',$_POST['id']??''); if($t){$t['active']=strtolower($t['active'])==='false'?'true':'false'; entity_update('tests',$t);} redirect('index.php?page=settings&tab=tests'); }
     if ($action === 'test_rename') { $t=entity_find('tests',$_POST['id']??''); $n=trim($_POST['name']??''); if($t && $n!==''){ if(array_filter(entity_all('tests'),fn($b)=>$b['id']!==$t['id'] && strtolower($b['name'])===strtolower($n))){ set_flash('error','A test with that name already exists'); } else { $t['name']=$n; entity_update('tests',$t); set_flash('success','Test renamed'); } } redirect('index.php?page=settings&tab=tests'); }
     if ($action === 'test_delete') { entity_delete('tests',$_POST['id']??''); set_flash('success','Test deleted'); redirect('index.php?page=settings&tab=tests'); }
+    // Repair service types (stored as a JSON list in app_config)
+    if ($action === 'rtype_add') { $n=trim($_POST['name']??''); $l=service_type_list(); if($n!=='' && !in_array(strtolower($n), array_map('strtolower',$l), true)){ $l[]=$n; set_service_types($l); set_flash('success','Service type added'); } else if($n!=='') { set_flash('error','That service type already exists'); } redirect('index.php?page=settings&tab=repairtypes'); }
+    if ($action === 'rtype_rename') { $i=(int)($_POST['index']??-1); $n=trim($_POST['name']??''); $l=service_type_list(); if(isset($l[$i]) && $n!==''){ $dup=false; foreach($l as $j=>$v){ if($j!==$i && strtolower($v)===strtolower($n)){ $dup=true; break; } } if($dup){ set_flash('error','That service type already exists'); } else { $l[$i]=$n; set_service_types($l); set_flash('success','Service type renamed'); } } redirect('index.php?page=settings&tab=repairtypes'); }
+    if ($action === 'rtype_delete') { $i=(int)($_POST['index']??-1); $l=service_type_list(); if(isset($l[$i])){ array_splice($l,$i,1); set_service_types($l); set_flash('success','Service type deleted'); } redirect('index.php?page=settings&tab=repairtypes'); }
     // General settings
     if ($action === 'general_save') { set_config_value('clinicName', trim($_POST['clinicName']??'Maji Hearing Aids Centre')); set_config_value('workingHours', trim($_POST['workingHours']??'')); set_flash('success','General settings saved'); redirect('index.php?page=settings&tab=general'); }
     // Services (no id: match category+description)
@@ -41,7 +45,7 @@ $tests = entity_all('tests');
 $services = array_map(fn($r)=>['category'=>$r['category']?:'Service','description'=>$r['description'],'price'=>$r['price']], services_all());
 $config = get_config();
 $CATS = ['Service','Hearing Aids','Accessories'];
-$tabs = ['branches'=>'Branches','services'=>'Service Catalog','brands'=>'HA Brands','tests'=>'Medical Tests','whatsapp'=>'WhatsApp','database'=>'Database & Sync','general'=>'General'];
+$tabs = ['branches'=>'Branches','services'=>'Service Catalog','brands'=>'HA Brands','tests'=>'Medical Tests','repairtypes'=>'Repair Types','whatsapp'=>'WhatsApp','database'=>'Database & Sync','general'=>'General'];
 require __DIR__ . '/../partials/top.php';
 ?>
 <h1 class="text-2xl font-bold text-gray-900 mb-5">Settings</h1>
@@ -113,6 +117,28 @@ require __DIR__ . '/../partials/top.php';
     document.getElementById('rn_name').value = v;
     document.getElementById('renameForm').submit();
   }
+  </script>
+
+<?php elseif ($tab === 'repairtypes'): $rtypes = service_type_list(); ?>
+  <h2 class="text-lg font-semibold text-gray-900">Repair Service Types</h2>
+  <p class="text-sm text-gray-500 mb-4">Manage the Service Type options shown in HA Repairs &rarr; Add Repair. Add new types, fix spellings, or remove unused ones.</p>
+  <form method="post" class="flex gap-2 max-w-md mb-4"><input type="hidden" name="action" value="rtype_add"><input type="text" name="name" placeholder="New service type name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">+ Add</button></form>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <?php foreach ($rtypes as $i=>$rt): ?>
+      <div class="rounded-lg border border-gray-200 bg-white p-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-sm font-medium text-gray-900 truncate"><?= h($rt) ?></span>
+        </div>
+        <div class="mt-2 flex items-center gap-3 border-t border-gray-100 pt-2 text-xs font-medium">
+          <button type="button" onclick="renameRType(<?= $i ?>,<?= h(json_encode($rt)) ?>)" class="text-indigo-600 hover:text-indigo-800">Edit</button>
+          <form method="post" onsubmit="return confirm('Delete this service type?')"><input type="hidden" name="action" value="rtype_delete"><input type="hidden" name="index" value="<?= $i ?>"><button class="text-red-500 hover:text-red-700">Delete</button></form>
+        </div>
+      </div>
+    <?php endforeach; if(!$rtypes): ?><p class="col-span-full text-center py-8 text-gray-500">None configured</p><?php endif; ?>
+  </div>
+  <form method="post" id="rtypeForm" class="hidden"><input type="hidden" name="action" value="rtype_rename"><input type="hidden" name="index" id="rt_index"><input type="hidden" name="name" id="rt_name"></form>
+  <script>
+  function renameRType(i, current){ var v=prompt('Rename service type:', current); if(v===null) return; v=v.trim(); if(v==='') return; document.getElementById('rt_index').value=i; document.getElementById('rt_name').value=v; document.getElementById('rtypeForm').submit(); }
   </script>
 
 <?php elseif ($tab === 'whatsapp'): ?>
