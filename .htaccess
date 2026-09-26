@@ -11,7 +11,7 @@ DirectoryIndex index.php
 
 # Block direct access to lib/ and cache/
 RewriteEngine On
-RewriteRule ^(lib|cache)/ - [F,L]
+RewriteRule ^(lib|cache|uploads)/ - [F,L]
 
 # Front-controller style routing: everything goes through index.php
 # (index.php reads ?page=; direct .php files still work too)

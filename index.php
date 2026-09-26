@@ -87,6 +87,62 @@ if ($page === 'export') {
     exit;
 }
 
+// ---- Patient report files: stored on the server + streamed with auth ----
+if (in_array($page, ['report-upload','report-list','report-file','report-delete'], true)) {
+    $pid = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($_REQUEST['id'] ?? ''));
+    if ($pid === '') { http_response_code(400); exit('bad id'); }
+    $dir = __DIR__ . '/uploads/reports/' . $pid;
+    $allowedExt = ['jpg','jpeg','png','gif','webp','pdf'];
+
+    if ($page === 'report-list') {
+        header('Content-Type: application/json');
+        $out = [];
+        if (is_dir($dir)) {
+            foreach (scandir($dir) as $f) {
+                if ($f === '.' || $f === '..' || $f[0] === '.') continue;
+                $parts = explode('__', $f, 2);
+                $out[] = ['id'=>$parts[0], 'name'=>$parts[1] ?? $f, 'file'=>$f, 'date'=>date('Y-m-d', @filemtime($dir.'/'.$f) ?: time()), 'url'=>'index.php?page=report-file&id='.rawurlencode($pid).'&f='.rawurlencode($f)];
+            }
+        }
+        usort($out, fn($a,$b)=>strcmp((string)$b['id'], (string)$a['id']));
+        echo json_encode($out); exit;
+    }
+
+    if ($page === 'report-upload') {
+        header('Content-Type: application/json');
+        if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) { echo json_encode(['ok'=>false,'error'=>'upload failed']); exit; }
+        if ($_FILES['file']['size'] > 5*1024*1024) { echo json_encode(['ok'=>false,'error'=>'too large (max 5MB)']); exit; }
+        $orig = (string)$_FILES['file']['name'];
+        $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowedExt, true)) { echo json_encode(['ok'=>false,'error'=>'unsupported type']); exit; }
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) { echo json_encode(['ok'=>false,'error'=>'cannot create folder']); exit; }
+        $id = preg_replace('/\D/', '', (string)($_POST['id'] ?? '')) ?: (string)round(microtime(true)*1000);
+        $safeName = preg_replace('/[^A-Za-z0-9._ -]/', '_', $orig);
+        $file = $id . '__' . $safeName;
+        if (!move_uploaded_file($_FILES['file']['tmp_name'], $dir.'/'.$file)) { echo json_encode(['ok'=>false,'error'=>'save failed']); exit; }
+        echo json_encode(['ok'=>true, 'file'=>['id'=>$id,'name'=>$safeName,'file'=>$file,'date'=>date('Y-m-d'),'url'=>'index.php?page=report-file&id='.rawurlencode($pid).'&f='.rawurlencode($file)]]); exit;
+    }
+
+    if ($page === 'report-delete') {
+        header('Content-Type: application/json');
+        $f = basename((string)($_POST['f'] ?? ''));
+        if ($f !== '' && is_file($dir.'/'.$f)) @unlink($dir.'/'.$f);
+        echo json_encode(['ok'=>true]); exit;
+    }
+
+    if ($page === 'report-file') {
+        $f = basename((string)($_GET['f'] ?? ''));
+        $path = $dir.'/'.$f;
+        if ($f === '' || !is_file($path)) { http_response_code(404); exit('not found'); }
+        $ext = strtolower(pathinfo($f, PATHINFO_EXTENSION));
+        $types = ['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp','pdf'=>'application/pdf'];
+        header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
+        header('Content-Length: ' . filesize($path));
+        header('Content-Disposition: inline; filename="' . preg_replace('/^\d+__/', '', $f) . '"');
+        readfile($path); exit;
+    }
+}
+
 $viewFile = __DIR__ . '/views/' . $page . '.php';
 if (!file_exists($viewFile)) {
     http_response_code(404);

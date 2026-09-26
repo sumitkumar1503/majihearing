@@ -177,7 +177,7 @@ require __DIR__ . '/../partials/top.php';
       <span class="text-xs text-gray-500">JPG, PNG, or PDF (max 5MB)</span>
     </div>
     <div id="rp_list"></div>
-    <p class="text-xs text-gray-400 italic mt-3">Reports are stored locally on this device.</p>
+    <p class="text-xs text-gray-400 italic mt-3">Reports are saved on the server and cached on this device.</p>
   </div>
 </div>
 <div id="rp_preview" class="hidden fixed inset-0 z-[60] items-center justify-center bg-black/70 p-4" onclick="this.classList.add('hidden');this.classList.remove('flex')">
@@ -185,37 +185,69 @@ require __DIR__ . '/../partials/top.php';
 </div>
 
 <script>
-var RP_ID=null, RP_NAME='';
+var RP_ID=null, RP_NAME='', RP_SERVER=[];
 function rpKey(id){ return 'patient_reports_'+id; }
 function rpGet(id){ try{ return JSON.parse(localStorage.getItem(rpKey(id))||'[]'); }catch(e){ return []; } }
 function rpSet(id, arr){ localStorage.setItem(rpKey(id), JSON.stringify(arr)); }
 function rpIsPdf(n){ return String(n).toLowerCase().endsWith('.pdf'); }
-function openReports(id, name){ RP_ID=id; RP_NAME=name; document.getElementById('rp_name').textContent=name; rpRender(); openModal('reportModal'); }
+function openReports(id, name){ RP_ID=id; RP_NAME=name; document.getElementById('rp_name').textContent=name; document.getElementById('rp_list').innerHTML='<p class="text-sm text-gray-400 py-6 text-center">Loading…</p>'; openModal('reportModal'); rpLoad(); }
+function rpLoad(){
+  RP_SERVER=[];
+  fetch('index.php?page=report-list&id='+encodeURIComponent(RP_ID)).then(function(r){return r.ok?r.json():[];}).then(function(s){ RP_SERVER=Array.isArray(s)?s:[]; rpRender(); }).catch(function(){ rpRender(); });
+}
+// Merge server files (authoritative) with any local-only copies (by id).
+function rpMerged(){
+  var ids={}; var list=[];
+  RP_SERVER.forEach(function(s){ ids[String(s.id)]=true; list.push({id:s.id,name:s.name,date:s.date,url:s.url,file:s.file,source:'server'}); });
+  rpGet(RP_ID).forEach(function(l){ if(!ids[String(l.id)]) list.push({id:l.id,name:l.name,date:l.date,data:l.data,source:'local'}); });
+  list.sort(function(a,b){ return String(b.id).localeCompare(String(a.id)); });
+  return list;
+}
+function rpFind(id){ return rpMerged().filter(function(x){ return String(x.id)===String(id); })[0]; }
 function rpRender(){
-  var arr=rpGet(RP_ID), el=document.getElementById('rp_list');
+  var arr=rpMerged(), el=document.getElementById('rp_list');
   if(!arr.length){ el.innerHTML='<div class="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center"><p class="text-sm text-gray-500">No reports uploaded.</p><p class="text-xs text-gray-400 mt-1">Tap \'Upload Report\' or scan using camera.</p></div>'; return; }
   var html='<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">';
-  arr.forEach(function(r,i){
-    var thumb = rpIsPdf(r.name) ? '<div class="w-16 h-16 rounded-md bg-red-50 flex items-center justify-center text-red-400 text-2xl">PDF</div>' : '<img src="'+r.data+'" class="w-16 h-16 rounded-md object-cover bg-gray-100">';
+  arr.forEach(function(r){
+    var src = r.source==='server' ? r.url : r.data;
+    var thumb = rpIsPdf(r.name) ? '<div class="w-16 h-16 rounded-md bg-red-50 flex items-center justify-center text-red-400 text-2xl">PDF</div>' : '<img src="'+src+'" class="w-16 h-16 rounded-md object-cover bg-gray-100">';
+    var badge = r.source==='server' ? '<span class="ml-1 text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5">Server</span>' : '<span class="ml-1 text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Local only</span>';
+    var idj = JSON.stringify(String(r.id));
     html+='<div class="rounded-lg border border-gray-200 p-3 flex gap-3 items-start">'+thumb
-      +'<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.name+'</p><p class="text-xs text-gray-500">'+r.date+'</p>'
-      +'<div class="mt-1 flex gap-3 text-xs font-medium"><button type="button" onclick="rpView('+i+')" class="text-indigo-600 hover:text-indigo-800">View</button><button type="button" onclick="rpDelete('+i+')" class="text-red-500 hover:text-red-700">Delete</button></div></div></div>';
+      +'<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.name+'</p><p class="text-xs text-gray-500">'+r.date+badge+'</p>'
+      +'<div class="mt-1 flex gap-3 text-xs font-medium"><button type="button" onclick="rpView('+idj+')" class="text-indigo-600 hover:text-indigo-800">View</button><button type="button" onclick="rpDelete('+idj+')" class="text-red-500 hover:text-red-700">Delete</button></div></div></div>';
   });
   html+='</div>'; el.innerHTML=html;
 }
 function rpUpload(e){
   var f=e.target.files&&e.target.files[0]; if(!f) return;
   if(f.size>5*1024*1024){ alert('File too large (max 5MB)'); e.target.value=''; return; }
+  var id=Date.now().toString();
   var reader=new FileReader();
-  reader.onload=function(){ var arr=rpGet(RP_ID); arr.push({id:Date.now().toString(), name:f.name, data:reader.result, date:new Date().toISOString().slice(0,10)}); rpSet(RP_ID,arr); rpRender(); };
+  reader.onload=function(){
+    // 1) keep a local copy immediately
+    var arr=rpGet(RP_ID); arr.push({id:id, name:f.name, data:reader.result, date:new Date().toISOString().slice(0,10)}); rpSet(RP_ID,arr); rpRender();
+    // 2) upload to the server
+    var fd=new FormData(); fd.append('file', f); fd.append('id', id);
+    fetch('index.php?page=report-upload&id='+encodeURIComponent(RP_ID), {method:'POST', body:fd})
+      .then(function(r){return r.json();})
+      .then(function(res){ if(!res||!res.ok){ alert('Saved locally, but server upload failed'+(res&&res.error?': '+res.error:'')); } rpLoad(); })
+      .catch(function(){ alert('Saved locally, but server upload failed (network)'); rpRender(); });
+  };
   reader.onerror=function(){ alert('Failed to read file'); };
   reader.readAsDataURL(f); e.target.value='';
 }
-function rpDelete(i){ if(!confirm('Remove this report?')) return; var arr=rpGet(RP_ID); arr.splice(i,1); rpSet(RP_ID,arr); rpRender(); }
-function rpView(i){
-  var r=rpGet(RP_ID)[i]; if(!r) return; var box=document.getElementById('rp_preview_inner');
-  if(rpIsPdf(r.name)){ box.innerHTML='<div class="bg-white rounded-lg p-8 text-center"><p class="text-gray-700 font-medium mb-3">'+r.name+'</p><a href="'+r.data+'" download="'+r.name+'" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">Download PDF</a></div>'; }
-  else { box.innerHTML='<img src="'+r.data+'" class="w-full max-h-[90vh] object-contain rounded-lg">'; }
+function rpDelete(id){
+  if(!confirm('Remove this report?')) return;
+  var r=rpFind(id);
+  if(r && r.source==='server'){ var fd=new FormData(); fd.append('f', r.file); fetch('index.php?page=report-delete&id='+encodeURIComponent(RP_ID), {method:'POST', body:fd}).catch(function(){}); }
+  var loc=rpGet(RP_ID).filter(function(x){ return String(x.id)!==String(id); }); rpSet(RP_ID, loc);
+  setTimeout(rpLoad, 200);
+}
+function rpView(id){
+  var r=rpFind(id); if(!r) return; var src = r.source==='server' ? r.url : r.data; var box=document.getElementById('rp_preview_inner');
+  if(rpIsPdf(r.name)){ box.innerHTML='<div class="bg-white rounded-lg p-3"><div class="flex justify-between items-center mb-2"><p class="text-gray-700 font-medium truncate">'+r.name+'</p><a href="'+src+'" target="_blank" class="text-sm text-indigo-600">Open / Download</a></div><iframe src="'+src+'" class="w-full h-[80vh] rounded"></iframe></div>'; }
+  else { box.innerHTML='<img src="'+src+'" class="w-full max-h-[90vh] object-contain rounded-lg">'; }
   var p=document.getElementById('rp_preview'); p.classList.remove('hidden'); p.classList.add('flex');
 }
 
