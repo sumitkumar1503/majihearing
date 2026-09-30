@@ -1,5 +1,12 @@
 <?php
 /** Shared page shell: <head>, sidebar, header. Expects $title and $page. */
+// Never cache authenticated dashboard pages, so a refresh always shows the
+// latest data from MySQL (all branches share the same live database).
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
 $u = current_user();
 $role = current_role();
 $theme = role_theme($role);
