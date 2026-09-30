@@ -73,24 +73,28 @@ var items=[];
 function renderItems(){
   var b=document.getElementById('itemsBody'); b.innerHTML='';
   items.forEach(function(it,idx){
+    if(it.total==null||isNaN(it.total)) it.total=(it.quantity||0)*(it.price||0);
     var tr=document.createElement('tr'); tr.className='border-t border-gray-200';
     var opts='<option value="">Type custom...</option>'+SERVICES.map(function(s){return '<option value="'+s[1]+'"'+(s[1]===it.description?' selected':'')+'>'+s[1]+'</option>';}).join('');
     tr.innerHTML='<td class="px-3 py-2"><select onchange="pick('+idx+',this.value)" class="rounded border border-gray-300 px-2 py-1 text-sm w-full mb-1">'+opts+'</select><input value="'+(it.description||'').replace(/"/g,"&quot;")+'" oninput="items['+idx+'].description=this.value" placeholder="Description" class="rounded border border-gray-300 px-2 py-1 text-sm w-full"></td>'+
-      '<td class="px-3 py-2"><input type="number" min="1" value="'+it.quantity+'" oninput="items['+idx+'].quantity=+this.value||0;recalc()" class="rounded border border-gray-300 px-2 py-1 text-sm w-full"></td>'+
-      '<td class="px-3 py-2"><input type="number" value="'+it.price+'" oninput="items['+idx+'].price=+this.value||0;recalc()" class="rounded border border-gray-300 px-2 py-1 text-sm w-full"></td>'+
-      '<td class="px-3 py-2 font-medium">₹'+((it.quantity*it.price)||0).toLocaleString()+'</td>'+
+      '<td class="px-3 py-2"><input type="number" min="0" value="'+it.quantity+'" oninput="onQty('+idx+',this.value)" class="rounded border border-gray-300 px-2 py-1 text-sm w-full"></td>'+
+      '<td class="px-3 py-2"><input type="number" step="any" value="'+it.price+'" oninput="onPrice('+idx+',this.value)" class="rounded border border-gray-300 px-2 py-1 text-sm w-full"></td>'+
+      '<td class="px-3 py-2"><input type="number" step="any" id="it_total_'+idx+'" value="'+it.total+'" oninput="onItemTotal('+idx+',this.value)" class="rounded border border-gray-300 px-2 py-1 text-sm w-full font-medium text-green-700"></td>'+
       '<td class="px-3 py-2"><button type="button" onclick="items.splice('+idx+',1);renderItems();recalc()" class="text-red-500">✕</button></td>';
     b.appendChild(tr);
   });
 }
-function pick(idx,val){ var s=SERVICES.find(function(x){return x[1]===val;}); if(s){items[idx].description=s[1];items[idx].price=s[2];} else {items[idx].description='';} renderItems(); recalc(); }
-function addItem(){ items.push({item:'Service',description:'',quantity:1,price:0}); renderItems(); recalc(); }
-function invSubtotal(){ var sub=0; items.forEach(function(it){it.total=(it.quantity||0)*(it.price||0); sub+=it.total;}); return sub; }
+function onQty(i,v){ items[i].quantity=+v||0; items[i].total=(items[i].quantity||0)*(items[i].price||0); var el=document.getElementById('it_total_'+i); if(el) el.value=items[i].total; recalc(); }
+function onPrice(i,v){ items[i].price=+v||0; items[i].total=(items[i].quantity||0)*(items[i].price||0); var el=document.getElementById('it_total_'+i); if(el) el.value=items[i].total; recalc(); }
+function onItemTotal(i,v){ items[i].total=+v||0; recalc(); } // manual override of a line total
+function pick(idx,val){ var s=SERVICES.find(function(x){return x[1]===val;}); if(s){items[idx].description=s[1];items[idx].price=s[2];items[idx].total=(items[idx].quantity||0)*s[2];} else {items[idx].description='';} renderItems(); recalc(); }
+function addItem(){ items.push({item:'Service',description:'',quantity:1,price:0,total:0}); renderItems(); recalc(); }
+function invSubtotal(){ var sub=0; items.forEach(function(it){ sub+=(+it.total||0); }); return sub; }
 function recalc(){ var sub=invSubtotal(); document.getElementById('subT').textContent='₹'+sub.toLocaleString(); var disc=+document.getElementById('f_discount').value||0; document.getElementById('f_total').value=(sub-disc); }
 function onDiscountEdit(){ var sub=invSubtotal(); document.getElementById('subT').textContent='₹'+sub.toLocaleString(); var disc=+document.getElementById('f_discount').value||0; document.getElementById('f_total').value=(sub-disc); }
 function onTotalEdit(){ var sub=invSubtotal(); document.getElementById('subT').textContent='₹'+sub.toLocaleString(); var total=+document.getElementById('f_total').value||0; document.getElementById('f_discount').value=(sub-total); }
-function prepItems(){ items.forEach(function(it){it.total=(it.quantity||0)*(it.price||0);}); document.getElementById('f_items').value=JSON.stringify(items); return true; }
+function prepItems(){ items.forEach(function(it){ if(it.total==null||isNaN(it.total)) it.total=(it.quantity||0)*(it.price||0); }); document.getElementById('f_items').value=JSON.stringify(items); return true; }
 function openNew(){ resetForm(); document.getElementById('modalTitle').textContent='Create Invoice'; document.getElementById('f_invoiceNo').value='INV-'+String(Date.now()).slice(-6); document.getElementById('f_date').value=new Date().toISOString().slice(0,10); document.getElementById('f_discount').value=0; items=[{item:'Service',description:'',quantity:1,price:0}]; renderItems(); recalc(); openModal('modal'); }
-function openEdit(o){ resetForm(); fillForm(o); document.getElementById('modalTitle').textContent='Edit Invoice'; document.getElementById('f_discount').value=o.discount||0; items=(o.items&&o.items.length)?o.items.map(function(x){return {item:x.item||'Service',description:x.description||'',quantity:+x.quantity||1,price:+x.price||0};}):[{item:'Service',description:'',quantity:1,price:0}]; renderItems(); recalc(); openModal('modal'); }
+function openEdit(o){ resetForm(); fillForm(o); document.getElementById('modalTitle').textContent='Edit Invoice'; document.getElementById('f_discount').value=o.discount||0; items=(o.items&&o.items.length)?o.items.map(function(x){return {item:x.item||'Service',description:x.description||'',quantity:+x.quantity||1,price:+x.price||0,total:(x.total!=null&&x.total!==''?+x.total:((+x.quantity||0)*(+x.price||0)))};}):[{item:'Service',description:'',quantity:1,price:0,total:0}]; renderItems(); recalc(); if(o.total!=null&&o.total!==''){document.getElementById('f_total').value=+o.total;} openModal('modal'); }
 </script>
 <?php require __DIR__ . '/../partials/bottom.php';

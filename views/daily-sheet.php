@@ -117,9 +117,12 @@ require __DIR__ . '/../partials/top.php';
               $a = $c && $c['a'] ? $c['a'] : ''; $q = $c && $c['q'] ? $c['q'] : '';
               $rAmt += $c['a']??0; $rQty += $c['q']??0;
               $hl = ($c && ($c['a']||$c['q'])) ? 'bg-green-50' : '';
+              // Locked cells are READONLY (not disabled) so their values are still
+              // submitted — otherwise a partial submission would wipe older data on save.
+              $ro = $lk ? 'readonly' : '';
               echo '<td colspan="2" class="border border-gray-200 p-0 ' . $hl . '"><div class="flex">'
-                 . '<input type="number" step="any" name="amt[' . h($name) . '][' . $d . ']" value="' . h($a) . '" ' . ($lk?'disabled':'') . ' data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-amt w-12 px-1 py-1 text-center text-xs border-r border-gray-200 outline-none focus:bg-indigo-50 disabled:bg-gray-100">'
-                 . '<input type="number" step="any" name="qty[' . h($name) . '][' . $d . ']" value="' . h($q) . '" ' . ($lk?'disabled':'') . ' data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-qty w-7 px-0.5 py-1 text-center text-xs outline-none focus:bg-indigo-50 disabled:bg-gray-100">'
+                 . '<input type="number" step="any" name="amt[' . h($name) . '][' . $d . ']" value="' . h($a) . '" ' . $ro . ' data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-amt w-12 px-1 py-1 text-center text-xs border-r border-gray-200 outline-none focus:bg-indigo-50 read-only:bg-gray-100 read-only:text-gray-400">'
+                 . '<input type="number" step="any" name="qty[' . h($name) . '][' . $d . ']" value="' . h($q) . '" ' . $ro . ' data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-qty w-7 px-0.5 py-1 text-center text-xs outline-none focus:bg-indigo-50 read-only:bg-gray-100 read-only:text-gray-400">'
                  . '</div></td>';
           }
           echo '<td class="border border-gray-200 px-2 py-1 text-center font-semibold bg-yellow-50" data-total-amt="' . h($name) . '">₹' . number_format($rAmt) . '</td>';
