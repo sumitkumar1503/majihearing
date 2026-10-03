@@ -174,9 +174,9 @@ require __DIR__ . '/../partials/top.php';
     <p class="text-xs text-gray-400 mb-4">Stored securely on the server. Multiple files per patient are supported.</p>
     <div class="flex flex-wrap items-center gap-3 mb-4">
       <button type="button" id="rp_upBtn" onclick="document.getElementById('rp_file').click()" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">⬆ Add Report File</button>
-      <input type="file" id="rp_file" accept="image/*,.pdf" capture="environment" class="hidden" onchange="rpUpload(event)">
+      <input type="file" id="rp_file" accept="image/*,.heic,.heif,.avif,.pdf" class="hidden" onchange="rpUpload(event)">
       <a id="rp_dlAll" href="#" class="hidden inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">⬇ Download All (ZIP)</a>
-      <span class="text-xs text-gray-500">JPG, PNG or PDF (max 15MB)</span>
+      <span class="text-xs text-gray-500">Any image (JPG, PNG, HEIC…) or PDF (max 15MB)</span>
     </div>
     <div id="rp_list"><p class="text-sm text-gray-400 py-6 text-center">Loading…</p></div>
   </div>
@@ -187,7 +187,10 @@ require __DIR__ . '/../partials/top.php';
 
 <script>
 var RP_ID=null, RP_NAME='';
-function rpIsPdf(n){ return String(n).toLowerCase().endsWith('.pdf'); }
+function rpExt(n){ var m=String(n).toLowerCase().match(/\.([a-z0-9]+)$/); return m?m[1]:''; }
+function rpIsPdf(n){ return rpExt(n)==='pdf'; }
+// Formats browsers can render inline as <img>. HEIC/HEIF/TIFF can't — show an icon instead.
+function rpPreviewable(n){ return ['jpg','jpeg','png','gif','webp','bmp','avif'].indexOf(rpExt(n))>=0; }
 function rpEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function rpBase(action){ return 'index.php?page='+action+'&id='+encodeURIComponent(RP_ID)+'&name='+encodeURIComponent(RP_NAME); }
 function rpFileUrl(file, dl){ return rpBase('report-file')+'&f='+encodeURIComponent(file)+(dl?'&dl=1':''); }
@@ -209,7 +212,10 @@ function rpRender(list){
   var html='<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">';
   list.forEach(function(r){
     var isPdf=rpIsPdf(r.name); var viewUrl=rpFileUrl(r.file,false);
-    var thumb = isPdf ? '<div class="w-16 h-16 rounded-md bg-red-50 flex items-center justify-center text-red-500 text-xs font-bold shrink-0">PDF</div>' : '<img src="'+viewUrl+'" class="w-16 h-16 rounded-md object-cover bg-gray-100 shrink-0">';
+    var thumb;
+    if(isPdf){ thumb='<div class="w-16 h-16 rounded-md bg-red-50 flex items-center justify-center text-red-500 text-xs font-bold shrink-0">PDF</div>'; }
+    else if(rpPreviewable(r.name)){ thumb='<img src="'+viewUrl+'" class="w-16 h-16 rounded-md object-cover bg-gray-100 shrink-0">'; }
+    else { thumb='<div class="w-16 h-16 rounded-md bg-indigo-50 flex items-center justify-center text-indigo-500 text-[10px] font-bold uppercase shrink-0">'+(rpExt(r.name)||'IMG')+'</div>'; }
     var sizeKb = r.size ? Math.round(r.size/1024)+' KB' : '';
     html+='<div class="rounded-lg border border-gray-200 p-3 flex gap-3 items-start">'+thumb
       +'<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900 truncate" title="'+rpEsc(r.name)+'">'+rpEsc(r.name)+'</p>'
@@ -241,7 +247,8 @@ function rpDelete(file){
 function rpView(file, name){
   var url=rpFileUrl(file,false); var box=document.getElementById('rp_preview_inner');
   if(rpIsPdf(name)){ box.innerHTML='<div class="bg-white rounded-lg p-3"><div class="flex justify-between items-center mb-2"><p class="text-gray-700 font-medium truncate">'+rpEsc(name)+'</p><a href="'+rpFileUrl(file,true)+'" class="text-sm text-indigo-600">Download</a></div><iframe src="'+url+'" class="w-full h-[80vh] rounded"></iframe></div>'; }
-  else { box.innerHTML='<img src="'+url+'" class="w-full max-h-[90vh] object-contain rounded-lg">'; }
+  else if(rpPreviewable(name)){ box.innerHTML='<img src="'+url+'" class="w-full max-h-[90vh] object-contain rounded-lg">'; }
+  else { box.innerHTML='<div class="bg-white rounded-lg p-8 text-center"><p class="text-gray-700 font-medium mb-1">'+rpEsc(name)+'</p><p class="text-xs text-gray-500 mb-4">This format ('+(rpExt(name)||'image').toUpperCase()+') can\'t be previewed in the browser.</p><a href="'+rpFileUrl(file,true)+'" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">⬇ Download to view</a></div>'; }
   var p=document.getElementById('rp_preview'); p.classList.remove('hidden'); p.classList.add('flex');
 }
 

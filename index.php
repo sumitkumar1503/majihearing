@@ -118,8 +118,8 @@ if (in_array($page, ['report-upload','report-list','report-file','report-delete'
     $pname = trim((string)($_GET['name'] ?? ''));
     if ($pid === '') { http_response_code(400); exit('missing patient id'); }
     $dir = patient_category_dir($pid, $pname, 'reports');
-    $allowedExt = ['jpg','jpeg','png','gif','webp','pdf'];
-    $mime = ['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp','pdf'=>'application/pdf'];
+    $allowedExt = ['jpg','jpeg','png','gif','webp','bmp','tif','tiff','heic','heif','avif','pdf'];
+    $mime = ['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp','bmp'=>'image/bmp','tif'=>'image/tiff','tiff'=>'image/tiff','heic'=>'image/heic','heif'=>'image/heif','avif'=>'image/avif','pdf'=>'application/pdf'];
 
     if ($page === 'report-list') {
         header('Content-Type: application/json');
@@ -144,7 +144,7 @@ if (in_array($page, ['report-upload','report-list','report-file','report-delete'
         if ($_FILES['file']['size'] > 15*1024*1024) { echo json_encode(['ok'=>false,'error'=>'file too large (max 15MB)']); exit; }
         $orig = (string)$_FILES['file']['name'];
         $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
-        if (!in_array($ext, $allowedExt, true)) { echo json_encode(['ok'=>false,'error'=>'only JPG, PNG, GIF, WEBP or PDF allowed']); exit; }
+        if (!in_array($ext, $allowedExt, true)) { echo json_encode(['ok'=>false,'error'=>'unsupported file type (allowed: images or PDF)']); exit; }
         if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) { echo json_encode(['ok'=>false,'error'=>'cannot create patient folder']); exit; }
         $fid = (string)round(microtime(true)*1000);
         $safeName = preg_replace('/[^A-Za-z0-9._ -]/', '_', $orig);
