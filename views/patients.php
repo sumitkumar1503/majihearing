@@ -212,10 +212,10 @@ function rpRender(){
     var src = r.source==='server' ? r.url : r.data;
     var thumb = rpIsPdf(r.name) ? '<div class="w-16 h-16 rounded-md bg-red-50 flex items-center justify-center text-red-400 text-2xl">PDF</div>' : '<img src="'+src+'" class="w-16 h-16 rounded-md object-cover bg-gray-100">';
     var badge = r.source==='server' ? '<span class="ml-1 text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5">Server</span>' : '<span class="ml-1 text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Local only</span>';
-    var idj = JSON.stringify(String(r.id));
+    var idj = String(r.id).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     html+='<div class="rounded-lg border border-gray-200 p-3 flex gap-3 items-start">'+thumb
       +'<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.name+'</p><p class="text-xs text-gray-500">'+r.date+badge+'</p>'
-      +'<div class="mt-1 flex gap-3 text-xs font-medium"><button type="button" onclick="rpView('+idj+')" class="text-indigo-600 hover:text-indigo-800">View</button><button type="button" onclick="rpDelete('+idj+')" class="text-red-500 hover:text-red-700">Delete</button></div></div></div>';
+      +'<div class="mt-1 flex gap-3 text-xs font-medium"><button type="button" onclick="rpView(&quot;'+idj+'&quot;)" class="text-indigo-600 hover:text-indigo-800">View</button><button type="button" onclick="rpDelete(&quot;'+idj+'&quot;)" class="text-red-500 hover:text-red-700">Delete</button></div></div></div>';
   });
   html+='</div>'; el.innerHTML=html;
 }
