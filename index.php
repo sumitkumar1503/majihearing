@@ -13,6 +13,26 @@ require __DIR__ . '/lib/approvals.php';
 require __DIR__ . '/lib/reports.php';
 require __DIR__ . '/lib/sync.php';
 
+/** Locate (or create) a patient's base folder, keyed on the immutable patient id.
+ *  Finds an existing `<id>` or `<id>__*` folder; otherwise creates `<id>__<slug>`,
+ *  so renaming a patient never orphans their files and the id stays the key. */
+function patient_base_folder(string $pid, string $name = ''): string {
+    $root = __DIR__ . '/uploads/patients';
+    if (!is_dir($root)) @mkdir($root, 0775, true);
+    $matches = glob($root . '/' . $pid . '__*') ?: [];
+    if (is_dir($root . '/' . $pid)) $matches[] = $root . '/' . $pid;
+    if ($matches) return $matches[0];
+    $slug = $name !== '' ? '__' . trim(preg_replace('/_+/', '_', preg_replace('/[^A-Za-z0-9]+/', '_', $name)), '_') : '';
+    if (strlen($slug) > 60) $slug = substr($slug, 0, 60);
+    return $root . '/' . $pid . $slug;
+}
+/** A category subfolder (reports, invoices, …) inside the patient folder. */
+function patient_category_dir(string $pid, string $name, string $category): string {
+    $dir = patient_base_folder($pid, $name) . '/' . preg_replace('/[^a-z0-9_-]/', '', strtolower($category));
+    if (!is_dir($dir)) @mkdir($dir, 0775, true);
+    return $dir;
+}
+
 $page = $_GET['page'] ?? 'home';
 $page = preg_replace('/[^a-z0-9_-]/', '', (string)$page);
 if ($page === '') $page = 'home';
@@ -87,22 +107,29 @@ if ($page === 'export') {
     exit;
 }
 
-// ---- Patient report files: stored on the server + streamed with auth ----
-if (in_array($page, ['report-upload','report-list','report-file','report-delete'], true)) {
-    $pid = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($_REQUEST['id'] ?? ''));
-    if ($pid === '') { http_response_code(400); exit('bad id'); }
-    $dir = __DIR__ . '/uploads/reports/' . $pid;
+// ---- Patient files (reports, and future docs) — stored on the server only ----
+//
+// Layout (DBA-friendly, keyed on the immutable patient id):
+//   uploads/patients/<patientId>__<SanitizedName>/reports/<fileId>__<originalName>
+// The folder is located by the <patientId> prefix, so renames never orphan files,
+// and the same patient folder can later hold invoices/other categories.
+if (in_array($page, ['report-upload','report-list','report-file','report-delete','report-zip'], true)) {
+    $pid = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($_GET['id'] ?? ''));   // patient id — GET only
+    $pname = trim((string)($_GET['name'] ?? ''));
+    if ($pid === '') { http_response_code(400); exit('missing patient id'); }
+    $dir = patient_category_dir($pid, $pname, 'reports');
     $allowedExt = ['jpg','jpeg','png','gif','webp','pdf'];
+    $mime = ['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp','pdf'=>'application/pdf'];
 
     if ($page === 'report-list') {
         header('Content-Type: application/json');
         $out = [];
-        if (is_dir($dir)) {
-            foreach (scandir($dir) as $f) {
-                if ($f === '.' || $f === '..' || $f[0] === '.') continue;
-                $parts = explode('__', $f, 2);
-                $out[] = ['id'=>$parts[0], 'name'=>$parts[1] ?? $f, 'file'=>$f, 'date'=>date('Y-m-d', @filemtime($dir.'/'.$f) ?: time()), 'url'=>'index.php?page=report-file&id='.rawurlencode($pid).'&f='.rawurlencode($f)];
-            }
+        foreach (glob($dir.'/*') ?: [] as $fp) {
+            if (!is_file($fp)) continue;
+            $f = basename($fp);
+            if ($f[0] === '.') continue;
+            $parts = explode('__', $f, 2);
+            $out[] = ['id'=>$parts[0], 'name'=>$parts[1] ?? $f, 'file'=>$f, 'date'=>date('d M Y', @filemtime($fp) ?: time()), 'size'=>filesize($fp)];
         }
         usort($out, fn($a,$b)=>strcmp((string)$b['id'], (string)$a['id']));
         echo json_encode($out); exit;
@@ -110,17 +137,20 @@ if (in_array($page, ['report-upload','report-list','report-file','report-delete'
 
     if ($page === 'report-upload') {
         header('Content-Type: application/json');
-        if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) { echo json_encode(['ok'=>false,'error'=>'upload failed']); exit; }
-        if ($_FILES['file']['size'] > 5*1024*1024) { echo json_encode(['ok'=>false,'error'=>'too large (max 5MB)']); exit; }
+        if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            $errs = [1=>'file exceeds server limit',2=>'file too large',3=>'partial upload',4=>'no file',6=>'no temp dir',7=>'disk write failed'];
+            echo json_encode(['ok'=>false,'error'=>$errs[$_FILES['file']['error'] ?? 4] ?? 'upload failed']); exit;
+        }
+        if ($_FILES['file']['size'] > 15*1024*1024) { echo json_encode(['ok'=>false,'error'=>'file too large (max 15MB)']); exit; }
         $orig = (string)$_FILES['file']['name'];
         $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
-        if (!in_array($ext, $allowedExt, true)) { echo json_encode(['ok'=>false,'error'=>'unsupported type']); exit; }
-        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) { echo json_encode(['ok'=>false,'error'=>'cannot create folder']); exit; }
-        $id = preg_replace('/\D/', '', (string)($_POST['id'] ?? '')) ?: (string)round(microtime(true)*1000);
+        if (!in_array($ext, $allowedExt, true)) { echo json_encode(['ok'=>false,'error'=>'only JPG, PNG, GIF, WEBP or PDF allowed']); exit; }
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) { echo json_encode(['ok'=>false,'error'=>'cannot create patient folder']); exit; }
+        $fid = (string)round(microtime(true)*1000);
         $safeName = preg_replace('/[^A-Za-z0-9._ -]/', '_', $orig);
-        $file = $id . '__' . $safeName;
-        if (!move_uploaded_file($_FILES['file']['tmp_name'], $dir.'/'.$file)) { echo json_encode(['ok'=>false,'error'=>'save failed']); exit; }
-        echo json_encode(['ok'=>true, 'file'=>['id'=>$id,'name'=>$safeName,'file'=>$file,'date'=>date('Y-m-d'),'url'=>'index.php?page=report-file&id='.rawurlencode($pid).'&f='.rawurlencode($file)]]); exit;
+        $file = $fid . '__' . $safeName;
+        if (!move_uploaded_file($_FILES['file']['tmp_name'], $dir.'/'.$file)) { echo json_encode(['ok'=>false,'error'=>'could not save file']); exit; }
+        echo json_encode(['ok'=>true]); exit;
     }
 
     if ($page === 'report-delete') {
@@ -135,11 +165,26 @@ if (in_array($page, ['report-upload','report-list','report-file','report-delete'
         $path = $dir.'/'.$f;
         if ($f === '' || !is_file($path)) { http_response_code(404); exit('not found'); }
         $ext = strtolower(pathinfo($f, PATHINFO_EXTENSION));
-        $types = ['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp','pdf'=>'application/pdf'];
-        header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
+        $cleanName = preg_replace('/^\d+__/', '', $f);
+        header('Content-Type: ' . ($mime[$ext] ?? 'application/octet-stream'));
         header('Content-Length: ' . filesize($path));
-        header('Content-Disposition: inline; filename="' . preg_replace('/^\d+__/', '', $f) . '"');
+        header('Content-Disposition: ' . (isset($_GET['dl']) ? 'attachment' : 'inline') . '; filename="' . $cleanName . '"');
         readfile($path); exit;
+    }
+
+    if ($page === 'report-zip') {
+        $files = array_filter(glob($dir.'/*') ?: [], 'is_file');
+        if (!$files) { http_response_code(404); exit('no files to download'); }
+        if (!class_exists('ZipArchive')) { http_response_code(501); exit('ZIP not supported on server'); }
+        $zipBase = preg_replace('/[^A-Za-z0-9._-]+/', '_', ($pname !== '' ? $pname.'_' : '') . $pid);
+        $tmp = tempnam(sys_get_temp_dir(), 'rzip');
+        $z = new ZipArchive(); $z->open($tmp, ZipArchive::OVERWRITE);
+        foreach ($files as $fp) $z->addFile($fp, preg_replace('/^\d+__/', '', basename($fp)));
+        $z->close();
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $zipBase . '_reports.zip"');
+        header('Content-Length: ' . filesize($tmp));
+        readfile($tmp); @unlink($tmp); exit;
     }
 }
 

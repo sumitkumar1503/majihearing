@@ -164,90 +164,84 @@ require __DIR__ . '/../partials/top.php';
   </div>
 </div>
 
-<!-- Report Upload Modal (files stored locally on this device, mirrors original) -->
+<!-- Patient Reports — stored on the server only (no local storage) -->
 <div id="reportModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
   <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-semibold text-gray-900">Reports for <span id="rp_name"></span></h3>
+    <div class="flex items-center justify-between mb-1">
+      <h3 class="text-lg font-semibold text-gray-900">Reports — <span id="rp_name"></span></h3>
       <button type="button" onclick="closeModal('reportModal')" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">✕</button>
     </div>
-    <div class="flex items-center gap-3 mb-4">
-      <button type="button" onclick="document.getElementById('rp_file').click()" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">⬆ Upload Report</button>
+    <p class="text-xs text-gray-400 mb-4">Stored securely on the server. Multiple files per patient are supported.</p>
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <button type="button" id="rp_upBtn" onclick="document.getElementById('rp_file').click()" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">⬆ Add Report File</button>
       <input type="file" id="rp_file" accept="image/*,.pdf" capture="environment" class="hidden" onchange="rpUpload(event)">
-      <span class="text-xs text-gray-500">JPG, PNG, or PDF (max 5MB)</span>
+      <a id="rp_dlAll" href="#" class="hidden inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">⬇ Download All (ZIP)</a>
+      <span class="text-xs text-gray-500">JPG, PNG or PDF (max 15MB)</span>
     </div>
-    <div id="rp_list"></div>
-    <p class="text-xs text-gray-400 italic mt-3">Reports are saved on the server and cached on this device.</p>
+    <div id="rp_list"><p class="text-sm text-gray-400 py-6 text-center">Loading…</p></div>
   </div>
 </div>
-<div id="rp_preview" class="hidden fixed inset-0 z-[60] items-center justify-center bg-black/70 p-4" onclick="this.classList.add('hidden');this.classList.remove('flex')">
+<div id="rp_preview" class="hidden fixed inset-0 z-[60] items-center justify-center bg-black/80 p-4" onclick="this.classList.add('hidden');this.classList.remove('flex')">
   <div id="rp_preview_inner" class="max-w-4xl max-h-[90vh] w-full" onclick="event.stopPropagation()"></div>
 </div>
 
 <script>
-var RP_ID=null, RP_NAME='', RP_SERVER=[];
-function rpKey(id){ return 'patient_reports_'+id; }
-function rpGet(id){ try{ return JSON.parse(localStorage.getItem(rpKey(id))||'[]'); }catch(e){ return []; } }
-function rpSet(id, arr){ localStorage.setItem(rpKey(id), JSON.stringify(arr)); }
+var RP_ID=null, RP_NAME='';
 function rpIsPdf(n){ return String(n).toLowerCase().endsWith('.pdf'); }
-function openReports(id, name){ RP_ID=id; RP_NAME=name; document.getElementById('rp_name').textContent=name; document.getElementById('rp_list').innerHTML='<p class="text-sm text-gray-400 py-6 text-center">Loading…</p>'; openModal('reportModal'); rpLoad(); }
+function rpEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function rpBase(action){ return 'index.php?page='+action+'&id='+encodeURIComponent(RP_ID)+'&name='+encodeURIComponent(RP_NAME); }
+function rpFileUrl(file, dl){ return rpBase('report-file')+'&f='+encodeURIComponent(file)+(dl?'&dl=1':''); }
+function openReports(id, name){
+  if(!id){ alert('This patient has no ID yet. Please open & save the patient once, then try again.'); return; }
+  RP_ID=id; RP_NAME=name||'';
+  document.getElementById('rp_name').textContent=name||'';
+  document.getElementById('rp_list').innerHTML='<p class="text-sm text-gray-400 py-6 text-center">Loading…</p>';
+  document.getElementById('rp_dlAll').href=rpBase('report-zip');
+  openModal('reportModal'); rpLoad();
+}
 function rpLoad(){
-  RP_SERVER=[];
-  fetch('index.php?page=report-list&id='+encodeURIComponent(RP_ID)).then(function(r){return r.ok?r.json():[];}).then(function(s){ RP_SERVER=Array.isArray(s)?s:[]; rpRender(); }).catch(function(){ rpRender(); });
+  fetch(rpBase('report-list')).then(function(r){return r.ok?r.json():[];}).then(function(list){ rpRender(Array.isArray(list)?list:[]); }).catch(function(){ rpRender([]); });
 }
-// Merge server files (authoritative) with any local-only copies (by id).
-function rpMerged(){
-  var ids={}; var list=[];
-  RP_SERVER.forEach(function(s){ ids[String(s.id)]=true; list.push({id:s.id,name:s.name,date:s.date,url:s.url,file:s.file,source:'server'}); });
-  rpGet(RP_ID).forEach(function(l){ if(!ids[String(l.id)]) list.push({id:l.id,name:l.name,date:l.date,data:l.data,source:'local'}); });
-  list.sort(function(a,b){ return String(b.id).localeCompare(String(a.id)); });
-  return list;
-}
-function rpFind(id){ return rpMerged().filter(function(x){ return String(x.id)===String(id); })[0]; }
-function rpRender(){
-  var arr=rpMerged(), el=document.getElementById('rp_list');
-  if(!arr.length){ el.innerHTML='<div class="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center"><p class="text-sm text-gray-500">No reports uploaded.</p><p class="text-xs text-gray-400 mt-1">Tap \'Upload Report\' or scan using camera.</p></div>'; return; }
+function rpRender(list){
+  var el=document.getElementById('rp_list'), dlAll=document.getElementById('rp_dlAll');
+  if(!list.length){ el.innerHTML='<div class="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center"><p class="text-sm text-gray-500">No reports yet.</p><p class="text-xs text-gray-400 mt-1">Use \'Add Report File\' to upload (camera or gallery).</p></div>'; dlAll.classList.add('hidden'); return; }
+  dlAll.classList.remove('hidden');
   var html='<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">';
-  arr.forEach(function(r){
-    var src = r.source==='server' ? r.url : r.data;
-    var thumb = rpIsPdf(r.name) ? '<div class="w-16 h-16 rounded-md bg-red-50 flex items-center justify-center text-red-400 text-2xl">PDF</div>' : '<img src="'+src+'" class="w-16 h-16 rounded-md object-cover bg-gray-100">';
-    var badge = r.source==='server' ? '<span class="ml-1 text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5">Server</span>' : '<span class="ml-1 text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Local only</span>';
-    var idj = String(r.id).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  list.forEach(function(r){
+    var isPdf=rpIsPdf(r.name); var viewUrl=rpFileUrl(r.file,false);
+    var thumb = isPdf ? '<div class="w-16 h-16 rounded-md bg-red-50 flex items-center justify-center text-red-500 text-xs font-bold shrink-0">PDF</div>' : '<img src="'+viewUrl+'" class="w-16 h-16 rounded-md object-cover bg-gray-100 shrink-0">';
+    var sizeKb = r.size ? Math.round(r.size/1024)+' KB' : '';
     html+='<div class="rounded-lg border border-gray-200 p-3 flex gap-3 items-start">'+thumb
-      +'<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.name+'</p><p class="text-xs text-gray-500">'+r.date+badge+'</p>'
-      +'<div class="mt-1 flex gap-3 text-xs font-medium"><button type="button" onclick="rpView(&quot;'+idj+'&quot;)" class="text-indigo-600 hover:text-indigo-800">View</button><button type="button" onclick="rpDelete(&quot;'+idj+'&quot;)" class="text-red-500 hover:text-red-700">Delete</button></div></div></div>';
+      +'<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900 truncate" title="'+rpEsc(r.name)+'">'+rpEsc(r.name)+'</p>'
+      +'<p class="text-xs text-gray-500">'+r.date+(sizeKb?' · '+sizeKb:'')+'</p>'
+      +'<div class="mt-1.5 flex flex-wrap gap-3 text-xs font-medium">'
+      +'<button type="button" onclick="rpView(this.dataset.f, this.dataset.n)" data-f="'+rpEsc(r.file)+'" data-n="'+rpEsc(r.name)+'" class="text-indigo-600 hover:text-indigo-800">View</button>'
+      +'<a href="'+rpFileUrl(r.file,true)+'" class="text-emerald-600 hover:text-emerald-800">Download</a>'
+      +'<button type="button" onclick="rpDelete(this.dataset.f)" data-f="'+rpEsc(r.file)+'" class="text-red-500 hover:text-red-700">Delete</button>'
+      +'</div></div></div>';
   });
   html+='</div>'; el.innerHTML=html;
 }
 function rpUpload(e){
   var f=e.target.files&&e.target.files[0]; if(!f) return;
-  if(f.size>5*1024*1024){ alert('File too large (max 5MB)'); e.target.value=''; return; }
-  var id=Date.now().toString();
-  var reader=new FileReader();
-  reader.onload=function(){
-    // 1) keep a local copy immediately
-    var arr=rpGet(RP_ID); arr.push({id:id, name:f.name, data:reader.result, date:new Date().toISOString().slice(0,10)}); rpSet(RP_ID,arr); rpRender();
-    // 2) upload to the server
-    var fd=new FormData(); fd.append('file', f); fd.append('id', id);
-    fetch('index.php?page=report-upload&id='+encodeURIComponent(RP_ID), {method:'POST', body:fd})
-      .then(function(r){return r.json();})
-      .then(function(res){ if(!res||!res.ok){ alert('Saved locally, but server upload failed'+(res&&res.error?': '+res.error:'')); } rpLoad(); })
-      .catch(function(){ alert('Saved locally, but server upload failed (network)'); rpRender(); });
-  };
-  reader.onerror=function(){ alert('Failed to read file'); };
-  reader.readAsDataURL(f); e.target.value='';
+  if(f.size>15*1024*1024){ alert('File too large (max 15MB)'); e.target.value=''; return; }
+  var btn=document.getElementById('rp_upBtn'), old=btn.textContent; btn.textContent='Uploading…'; btn.disabled=true;
+  var fd=new FormData(); fd.append('file', f);
+  fetch(rpBase('report-upload'), {method:'POST', body:fd})
+    .then(function(r){return r.json();})
+    .then(function(res){ if(!res||!res.ok){ alert('Upload failed'+(res&&res.error?': '+res.error:'')); } rpLoad(); })
+    .catch(function(){ alert('Upload failed (network error)'); })
+    .finally(function(){ btn.textContent=old; btn.disabled=false; e.target.value=''; });
 }
-function rpDelete(id){
-  if(!confirm('Remove this report?')) return;
-  var r=rpFind(id);
-  if(r && r.source==='server'){ var fd=new FormData(); fd.append('f', r.file); fetch('index.php?page=report-delete&id='+encodeURIComponent(RP_ID), {method:'POST', body:fd}).catch(function(){}); }
-  var loc=rpGet(RP_ID).filter(function(x){ return String(x.id)!==String(id); }); rpSet(RP_ID, loc);
-  setTimeout(rpLoad, 200);
+function rpDelete(file){
+  if(!confirm('Delete this report permanently from the server?')) return;
+  var fd=new FormData(); fd.append('f', file);
+  fetch(rpBase('report-delete'), {method:'POST', body:fd}).then(function(){ rpLoad(); }).catch(function(){ rpLoad(); });
 }
-function rpView(id){
-  var r=rpFind(id); if(!r) return; var src = r.source==='server' ? r.url : r.data; var box=document.getElementById('rp_preview_inner');
-  if(rpIsPdf(r.name)){ box.innerHTML='<div class="bg-white rounded-lg p-3"><div class="flex justify-between items-center mb-2"><p class="text-gray-700 font-medium truncate">'+r.name+'</p><a href="'+src+'" target="_blank" class="text-sm text-indigo-600">Open / Download</a></div><iframe src="'+src+'" class="w-full h-[80vh] rounded"></iframe></div>'; }
-  else { box.innerHTML='<img src="'+src+'" class="w-full max-h-[90vh] object-contain rounded-lg">'; }
+function rpView(file, name){
+  var url=rpFileUrl(file,false); var box=document.getElementById('rp_preview_inner');
+  if(rpIsPdf(name)){ box.innerHTML='<div class="bg-white rounded-lg p-3"><div class="flex justify-between items-center mb-2"><p class="text-gray-700 font-medium truncate">'+rpEsc(name)+'</p><a href="'+rpFileUrl(file,true)+'" class="text-sm text-indigo-600">Download</a></div><iframe src="'+url+'" class="w-full h-[80vh] rounded"></iframe></div>'; }
+  else { box.innerHTML='<img src="'+url+'" class="w-full max-h-[90vh] object-contain rounded-lg">'; }
   var p=document.getElementById('rp_preview'); p.classList.remove('hidden'); p.classList.add('flex');
 }
 
