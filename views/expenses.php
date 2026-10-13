@@ -9,13 +9,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($assoc['date']==='' || $assoc['description']==='' || (float)$assoc['amount']<=0) { set_flash('error','Date, description and amount are required'); redirect('index.php?page=expenses'); }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('expenses', $assoc['id']) : null;
-        $res = submit_change('expenses', 'Expenses', $isEdit?'update':'create', $assoc, ($isEdit?'Update':'Add').' expense — '.$assoc['description'].' (₹'.$assoc['amount'].')', $old, !$admin);
+        $res = submit_change('expenses', 'Expenses', $isEdit?'update':'create', $assoc, ($isEdit?'Update':'Add').' expense — '.$assoc['description'].' (₹'.$assoc['amount'].')', $old, needs_edit_approval($admin, $isEdit ? ($old['date']??'') : $assoc['date']));
         set_flash('success', $res==='queued' ? 'Change sent for admin approval' : ($isEdit?'Expense updated':'Expense added'));
         redirect('index.php?page=expenses');
     }
     if ($a === 'delete') {
         $rec = entity_find('expenses', $_POST['id']??'');
-        $res = submit_change('expenses','Expenses','delete',['id'=>$_POST['id']??''],'Delete expense — '.($rec['description']??''),$rec,!$admin);
+        $res = submit_change('expenses','Expenses','delete',['id'=>$_POST['id']??''],'Delete expense — '.($rec['description']??''),$rec, needs_edit_approval($admin, $rec['date']??''));
         set_flash('success', $res==='queued' ? 'Delete sent for admin approval' : 'Deleted');
         redirect('index.php?page=expenses');
     }

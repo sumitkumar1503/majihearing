@@ -156,6 +156,25 @@ function pill(string $status): string {
     return 'bg-gray-100 text-gray-600';
 }
 
+/**
+ * Edit-window lock based on the SERVER's date (never the client clock).
+ * Entries dated within the last 3 days (today + the previous 3 days) are open
+ * for direct editing; anything older is "locked" and a non-admin change must go
+ * through admin approval. Empty/unknown dates are treated as open.
+ */
+function entry_locked(?string $dateStr): bool {
+    $t = safe_parse_date($dateStr);
+    if (!$t) return false;
+    $entryDay = strtotime($t->format('Y-m-d'));
+    $todayDay = strtotime(date('Y-m-d')); // server date
+    return (int) floor(($todayDay - $entryDay) / 86400) > 3;
+}
+
+/** A non-admin change needs approval when the relevant entry date is locked. */
+function needs_edit_approval(bool $isAdmin, ?string $entryDate): bool {
+    return !$isAdmin && entry_locked($entryDate);
+}
+
 /** Sort rows by a date field, newest first. Robust across date formats. */
 function sort_by_date_desc(array &$rows, string $field = 'date'): void {
     usort($rows, function ($a, $b) use ($field) {

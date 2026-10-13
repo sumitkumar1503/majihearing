@@ -9,13 +9,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($assoc['date']==='' || $assoc['name']==='') { set_flash('error','Date and accessory name are required'); redirect('index.php?page=accessories'); }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('accessories', $assoc['id']) : null;
-        $res = submit_change('accessories','Accessories',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' accessory — '.$assoc['name'].' ×'.$assoc['quantity'],$old,!$admin);
+        $res = submit_change('accessories','Accessories',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' accessory — '.$assoc['name'].' ×'.$assoc['quantity'],$old, needs_edit_approval($admin, $isEdit ? ($old['date']??'') : $assoc['date']));
         set_flash('success', $res==='queued'?'Change sent for admin approval':($isEdit?'Accessory updated':'Accessory added'));
         redirect('index.php?page=accessories');
     }
     if ($a === 'delete') {
         $rec = entity_find('accessories', $_POST['id']??'');
-        $res = submit_change('accessories','Accessories','delete',['id'=>$_POST['id']??''],'Delete accessory — '.($rec['name']??''),$rec,!$admin);
+        $res = submit_change('accessories','Accessories','delete',['id'=>$_POST['id']??''],'Delete accessory — '.($rec['name']??''),$rec, needs_edit_approval($admin, $rec['date']??''));
         set_flash('success', $res==='queued'?'Delete sent for admin approval':'Deleted');
         redirect('index.php?page=accessories');
     }

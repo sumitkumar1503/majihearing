@@ -9,13 +9,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($assoc['model']==='' || $assoc['brand']==='') { set_flash('error','Brand and model are required'); redirect('index.php?page=ha-stock'); }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('ha-stock', $assoc['id']) : null;
-        $res = submit_change('ha-stock','HA Stock',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' HA stock — '.$assoc['brand'].' '.$assoc['model'].' (SN '.$assoc['serialNumber'].')',$old,!$admin);
+        $res = submit_change('ha-stock','HA Stock',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' HA stock — '.$assoc['brand'].' '.$assoc['model'].' (SN '.$assoc['serialNumber'].')',$old, needs_edit_approval($admin, $isEdit ? ($old['date']??'') : $assoc['date']));
         set_flash('success', $res==='queued' ? 'Change sent for admin approval' : ($isEdit?'Stock updated':'Stock item added'));
         redirect('index.php?page=ha-stock');
     }
     if ($a === 'delete') {
         $rec = entity_find('ha-stock', $_POST['id']??'');
-        $res = submit_change('ha-stock','HA Stock','delete',['id'=>$_POST['id']??''],'Delete HA stock — '.($rec['brand']??'').' '.($rec['model']??''),$rec,!$admin);
+        $res = submit_change('ha-stock','HA Stock','delete',['id'=>$_POST['id']??''],'Delete HA stock — '.($rec['brand']??'').' '.($rec['model']??''),$rec, needs_edit_approval($admin, $rec['date']??''));
         set_flash('success', $res==='queued'?'Change sent for admin approval':'Deleted');
         redirect('index.php?page=ha-stock');
     }

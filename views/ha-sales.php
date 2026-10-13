@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($assoc['name']==='' || $assoc['haModel']==='') { set_flash('error','Name and HA Model are required'); redirect('index.php?page=ha-sales'); }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('ha-sales', $assoc['id']) : null;
-        $res = submit_change('ha-sales','HA Sales',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' HA sale — '.$assoc['name'].' / '.$assoc['haModel'].' (₹'.$assoc['sellingPrice'].')',$old,!$admin);
+        $res = submit_change('ha-sales','HA Sales',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' HA sale — '.$assoc['name'].' / '.$assoc['haModel'].' (₹'.$assoc['sellingPrice'].')',$old, needs_edit_approval($admin, $isEdit ? ($old['date']??'') : $assoc['date']));
         // On a direct (admin) create, deduct matching serials from HA stock.
         if ($res === 'applied' && !$isEdit) {
             $stock = entity_all('ha-stock');
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($a === 'delete') {
         $rec = entity_find('ha-sales', $_POST['id']??'');
-        $res = submit_change('ha-sales','HA Sales','delete',['id'=>$_POST['id']??''],'Delete HA sale — '.($rec['name']??''),$rec,!$admin);
+        $res = submit_change('ha-sales','HA Sales','delete',['id'=>$_POST['id']??''],'Delete HA sale — '.($rec['name']??''),$rec, needs_edit_approval($admin, $rec['date']??''));
         set_flash('success', $res==='queued'?'Change sent for admin approval':'Deleted');
         redirect('index.php?page=ha-sales');
     }

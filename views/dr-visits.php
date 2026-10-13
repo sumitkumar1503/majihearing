@@ -10,11 +10,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($assoc['doctorName']==='' || $assoc['dateOfVisit']==='') { set_flash('error','Doctor and date are required'); redirect('index.php?page=dr-visits'); }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('dr-visits', $assoc['id']) : null;
-        // Date locks 3 days after entry: a non-admin date change after that needs approval.
-        $dateChanged = $old && $old['dateOfVisit'] !== $assoc['dateOfVisit'];
-        $needsApproval = $isEdit && !$admin && $dateChanged && days_since_str($old['dateOfVisit']) > 3;
-        $res = submit_change('dr-visits','Doctor Visit',$isEdit?'update':'create',$assoc,'Update doctor visit — '.$assoc['doctorName'].' (date change after 3-day lock)',$old,$needsApproval);
-        set_flash('success', $res==='queued' ? 'Date change sent to Admin for approval' : ($isEdit?'Visit updated':'Visit added'));
+        // Entries older than 3 days (server date) are locked: a non-admin edit needs approval.
+        $needsApproval = needs_edit_approval($admin, $isEdit ? ($old['dateOfVisit']??'') : $assoc['dateOfVisit']);
+        $res = submit_change('dr-visits','Doctor Visit',$isEdit?'update':'create',$assoc,'Update doctor visit — '.$assoc['doctorName'].' (edit after 3-day lock)',$old,$needsApproval);
+        set_flash('success', $res==='queued' ? 'Change sent to Admin for approval (locked after 3 days)' : ($isEdit?'Visit updated':'Visit added'));
         redirect('index.php?page=dr-visits');
     }
     if ($a === 'delete' && $canDelete) { entity_delete('dr-visits', $_POST['id']??''); set_flash('success','Deleted'); redirect('index.php?page=dr-visits'); }

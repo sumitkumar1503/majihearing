@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach (['date','doctorReferral','noOfPatients','amount','fromDate','tillDate','visitLocation','visitedBy'] as $req) if ($assoc[$req]==='') { set_flash('error','All fields are required'); redirect('index.php?page=dr-payments'); }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('dr-payments', $assoc['id']) : null;
-        $needsApproval = $isEdit && !$admin && $old && ds_days($old['date']) > 3;
+        $needsApproval = needs_edit_approval($admin, $isEdit ? ($old['date']??'') : $assoc['date']);
         $res = submit_change('dr-payments','Doctor Payments',$isEdit?'update':'create',$assoc,'Update doctor payment — '.$assoc['doctorReferral'].' ₹'.$assoc['amount'].' (edit after 3-day lock)',$old,$needsApproval);
         set_flash('success', $res==='queued' ? 'Edit sent to Admin for approval (locked after 3 days)' : ($isEdit?'Payment updated':'Payment added'));
         redirect('index.php?page=dr-payments');

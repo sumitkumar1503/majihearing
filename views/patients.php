@@ -30,8 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('patients', $assoc['id']) : null;
-        $days = $old ? (int)((time() - (safe_parse_date($old['date'])?->getTimestamp() ?? time())) / 86400) : 0;
-        $needsApproval = $isEdit && !$admin && $days > 10;
+        $needsApproval = needs_edit_approval($admin, $isEdit ? ($old['date'] ?? '') : $assoc['date']);
         $res = submit_change('patients', 'Patient Details', $isEdit ? 'update' : 'create', $assoc, 'Patient — ' . $assoc['name'], $old, $needsApproval);
         set_flash($res === 'queued' ? 'success' : 'success', $res === 'queued' ? 'Change sent for admin approval. Original stays until approved.' : ($isEdit ? 'Patient updated' : 'Patient added'));
         redirect('index.php?page=patients');

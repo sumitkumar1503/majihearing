@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($assoc['staffName']==='' || $assoc['date']==='') { set_flash('error','Staff name and date are required'); redirect('index.php?page=staff-ta'); }
         $isEdit = $assoc['id'] !== '';
         $old = $isEdit ? entity_find('staff-ta', $assoc['id']) : null;
-        $res = submit_change('staff-ta','Staff TA',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' TA — '.$assoc['staffName'].' (₹'.$assoc['totalAmount'].')',$old,!$admin);
+        $res = submit_change('staff-ta','Staff TA',$isEdit?'update':'create',$assoc,($isEdit?'Update':'Add').' TA — '.$assoc['staffName'].' (₹'.$assoc['totalAmount'].')',$old, needs_edit_approval($admin, $isEdit ? ($old['date']??'') : $assoc['date']));
         set_flash('success', $res==='queued' ? 'TA submitted for admin approval' : ($isEdit?'Entry updated':'Entry added'));
         redirect('index.php?page=staff-ta');
     }

@@ -21,27 +21,47 @@ function ds_day_locked(int $y, int $m0, int $d, bool $admin): bool {
 $isDefault = fn($n) => in_array($n, $GLOBALS['TESTS'], true) || in_array($n, $GLOBALS['ACCESSORY_DEFAULT'], true);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Existing saved grid — used to preserve locked days on a direct save and to
+    // detect whether any locked (older-than-3-day) cell was actually changed.
+    $dbGrid = [];
+    foreach (daily_sheet_rows($branch, $monthStr) as $r) {
+        if ((int)cell($r, 1) >= 1) $dbGrid[cell($r, 0)][(int)cell($r, 1)] = ['a'=>(float)cell($r, 2), 'q'=>(float)cell($r, 3)];
+    }
     $meta = json_decode($_POST['rowsmeta'] ?? '[]', true);
     if (!is_array($meta)) $meta = [];
     $amt = $_POST['amt'] ?? []; $qty = $_POST['qty'] ?? [];
-    $entries = [];
+    $directEntries = []; $fullEntries = []; $lockedChanged = false;
     foreach ($meta as $row) {
         $name = trim($row['name'] ?? '');
         if ($name === '') continue;
         $sec = (($row['section'] ?? 'test') === 'accessory') ? 'accessory' : 'test';
-        $has = false;
+        $hasDirect = false; $hasFull = false;
         for ($d = 1; $d <= $daysCount; $d++) {
-            $a = (float)($amt[$name][$d] ?? 0); $qq = (float)($qty[$name][$d] ?? 0);
-            if ($a > 0 || $qq > 0) { $entries[] = ['testName'=>$name,'day'=>$d,'amount'=>$a,'quantity'=>$qq,'section'=>$sec]; $has = true; }
+            $subA = (float)($amt[$name][$d] ?? 0); $subQ = (float)($qty[$name][$d] ?? 0);
+            $dbA = $dbGrid[$name][$d]['a'] ?? 0; $dbQ = $dbGrid[$name][$d]['q'] ?? 0;
+            $locked = !$admin && ds_day_locked($year, $month, $d, false);
+            // Full (requested) grid = exactly what was submitted.
+            if ($subA > 0 || $subQ > 0) { $fullEntries[] = ['testName'=>$name,'day'=>$d,'amount'=>$subA,'quantity'=>$subQ,'section'=>$sec]; $hasFull = true; }
+            // Direct grid = submitted for open days, but DB values for locked days.
+            $dA = $locked ? $dbA : $subA; $dQ = $locked ? $dbQ : $subQ;
+            if ($dA > 0 || $dQ > 0) { $directEntries[] = ['testName'=>$name,'day'=>$d,'amount'=>$dA,'quantity'=>$dQ,'section'=>$sec]; $hasDirect = true; }
+            if ($locked && ($subA != $dbA || $subQ != $dbQ)) $lockedChanged = true;
         }
-        // Persist empty custom rows via a day=0 sentinel so they reappear on reload.
-        if (!$has && !$isDefault($name)) $entries[] = ['testName'=>$name,'day'=>0,'amount'=>0,'quantity'=>0,'section'=>$sec];
+        if (!$hasDirect && !$isDefault($name)) $directEntries[] = ['testName'=>$name,'day'=>0,'amount'=>0,'quantity'=>0,'section'=>$sec];
+        if (!$hasFull && !$isDefault($name)) $fullEntries[] = ['testName'=>$name,'day'=>0,'amount'=>0,'quantity'=>0,'section'=>$sec];
     }
-    $payload = ['month'=>$monthStr,'branch'=>$branch,'entries'=>$entries];
-    if ($admin) { save_daily_sheet($branch, $monthStr, $entries); mark_daily_dirty($branch, $monthStr); set_flash('success','Daily sheet saved'); }
-    else {
-        entity_insert('approvals', ['createdAt'=>date('c'),'requestedBy'=>current_user()['name']??'','requestedByRole'=>current_role(),'module'=>'daily-sheet','moduleLabel'=>'Daily Sheet','action'=>'update','targetId'=>"$branch-$monthStr",'summary'=>"Update daily sheet — $branch / $monthStr",'oldValue'=>'','newValue'=>json_encode($payload),'status'=>'pending','reviewedBy'=>'','reviewedAt'=>'']);
-        set_flash('success','Sheet sent for admin approval');
+    if ($admin) {
+        save_daily_sheet($branch, $monthStr, $fullEntries); mark_daily_dirty($branch, $monthStr);
+        set_flash('success', 'Daily sheet saved');
+    } else {
+        // Recent-day edits apply immediately; locked-day changes need admin approval.
+        save_daily_sheet($branch, $monthStr, $directEntries); mark_daily_dirty($branch, $monthStr);
+        if ($lockedChanged) {
+            entity_insert('approvals', ['createdAt'=>date('c'),'requestedBy'=>current_user()['name']??'','requestedByRole'=>current_role(),'module'=>'daily-sheet','moduleLabel'=>'Daily Sheet','action'=>'update','targetId'=>"$branch-$monthStr",'summary'=>"Daily sheet — change to locked days ($branch / $monthStr)",'oldValue'=>'','newValue'=>json_encode(['month'=>$monthStr,'branch'=>$branch,'entries'=>$fullEntries]),'status'=>'pending','reviewedBy'=>'','reviewedAt'=>'']);
+            set_flash('success', 'Recent entries saved. Changes to older (locked) days were sent to Admin for approval.');
+        } else {
+            set_flash('success', 'Daily sheet saved');
+        }
     }
     redirect("index.php?page=daily-sheet&year=$year&month=$month&branch=" . urlencode($branch));
 }
@@ -79,7 +99,7 @@ require __DIR__ . '/../partials/top.php';
   <select name="month" onchange="this.form.submit()" class="rounded-lg border border-gray-300 px-3 py-2 text-sm"><?php foreach ($MONTH_NAMES as $i=>$mn): ?><option value="<?= $i ?>" <?= $month===$i?'selected':'' ?>><?= $mn ?></option><?php endforeach; ?></select>
   <input type="number" name="year" value="<?= $year ?>" min="2020" max="2030" onchange="this.form.submit()" class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm">
   <select name="branch" onchange="this.form.submit()" class="rounded-lg border border-gray-300 px-3 py-2 text-sm"><?php foreach ($branchList as $b): ?><option <?= $branch===$b?'selected':'' ?>><?= h($b) ?></option><?php endforeach; ?></select>
-  <?php if (!$admin): ?><span class="ml-auto text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">Entries older than 3 days are locked</span><?php endif; ?>
+  <?php if (!$admin): ?><span class="ml-auto text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">Last 3 days save instantly · older days (amber) need admin approval</span><?php endif; ?>
 </form>
 
 <!-- Summary cards -->
@@ -117,12 +137,12 @@ require __DIR__ . '/../partials/top.php';
               $a = $c && $c['a'] ? $c['a'] : ''; $q = $c && $c['q'] ? $c['q'] : '';
               $rAmt += $c['a']??0; $rQty += $c['q']??0;
               $hl = ($c && ($c['a']||$c['q'])) ? 'bg-green-50' : '';
-              // Locked cells are READONLY (not disabled) so their values are still
-              // submitted — otherwise a partial submission would wipe older data on save.
-              $ro = $lk ? 'readonly' : '';
+              // Older-than-3-day cells stay editable (amber) but their changes go to
+              // admin approval; recent days save directly. Enforced server-side on save.
+              $lkCls = $lk ? ' bg-amber-50' : '';
               echo '<td colspan="2" class="border border-gray-200 p-0 ' . $hl . '"><div class="flex">'
-                 . '<input type="number" step="any" name="amt[' . h($name) . '][' . $d . ']" value="' . h($a) . '" ' . $ro . ' data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-amt w-12 px-1 py-1 text-center text-xs border-r border-gray-200 outline-none focus:bg-indigo-50 read-only:bg-gray-100 read-only:text-gray-400">'
-                 . '<input type="number" step="any" name="qty[' . h($name) . '][' . $d . ']" value="' . h($q) . '" ' . $ro . ' data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-qty w-7 px-0.5 py-1 text-center text-xs outline-none focus:bg-indigo-50 read-only:bg-gray-100 read-only:text-gray-400">'
+                 . '<input type="number" step="any" name="amt[' . h($name) . '][' . $d . ']" value="' . h($a) . '" data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-amt w-12 px-1 py-1 text-center text-xs border-r border-gray-200 outline-none focus:bg-indigo-50' . $lkCls . '">'
+                 . '<input type="number" step="any" name="qty[' . h($name) . '][' . $d . ']" value="' . h($q) . '" data-r="' . h($name) . '" data-d="' . $d . '" data-sec="' . $section . '" oninput="dsRecalc()" class="ds-qty w-7 px-0.5 py-1 text-center text-xs outline-none focus:bg-indigo-50' . $lkCls . '">'
                  . '</div></td>';
           }
           echo '<td class="border border-gray-200 px-2 py-1 text-center font-semibold bg-yellow-50" data-total-amt="' . h($name) . '">₹' . number_format($rAmt) . '</td>';
